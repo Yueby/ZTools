@@ -272,6 +272,19 @@ onMounted(async () => {
     window.ztools.launch(options)
   })
 
+  // 监听插件重定向搜索事件
+  window.ztools.onRedirectSearch((data) => {
+    console.log('收到重定向搜索事件:', data)
+    // 切换到搜索视图
+    currentView.value = ViewMode.Search
+    // 设置搜索内容
+    searchQuery.value = data.cmdName
+    // 聚焦搜索框
+    nextTick(() => {
+      searchBoxRef.value?.focus()
+    })
+  })
+
   // 监听插件变化事件（安装或删除插件后刷新应用列表）
   window.ztools.onPluginsChanged(async () => {
     console.log('插件列表已变化，重新加载应用列表和用户数据')

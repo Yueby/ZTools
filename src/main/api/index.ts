@@ -21,6 +21,7 @@ import pluginWindowAPI from './plugin/window'
 import pluginScreenAPI from './plugin/screen'
 import pluginInputAPI from './plugin/input'
 import pluginShellAPI from './plugin/shell'
+import pluginRedirectAPI from './plugin/redirect'
 import { pluginFeatureAPI } from './plugin/feature'
 
 /**
@@ -57,6 +58,7 @@ class APIManager {
     pluginScreenAPI.init()
     pluginInputAPI.init(pluginManager)
     pluginShellAPI.init()
+    pluginRedirectAPI.init(mainWindow)
     pluginFeatureAPI.init(pluginManager)
 
     // 初始化软件更新API

@@ -256,8 +256,8 @@ window.ztools = {
   getWebContentsId: () => electron.ipcRenderer.sendSync('get-web-contents-id'),
   // 使用系统默认程序打开 URL
   shellOpenExternal: (url) => electron.ipcRenderer.sendSync('shell-open-external', url),
-
-
+  // 插件跳转
+  redirect: (label, payload) => electron.ipcRenderer.sendSync('ztools-redirect', { label, payload })
 }
 
 electron.ipcRenderer.on('on-plugin-enter', (event, launchParam) => {

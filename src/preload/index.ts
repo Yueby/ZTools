@@ -64,6 +64,9 @@ contextBridge.exposeInMainWorld('ztools', {
   onBackToSearch: (callback: () => void) => {
     ipcRenderer.on('back-to-search', callback)
   },
+  onRedirectSearch: (callback: (data: { cmdName: string; payload?: any }) => void) => {
+    ipcRenderer.on('redirect-search', (_event, data) => callback(data))
+  },
   onPluginOpened: (callback: (plugin: { name: string; logo: string; path: string }) => void) => {
     ipcRenderer.on('plugin-opened', (_event, plugin) => callback(plugin))
   },
