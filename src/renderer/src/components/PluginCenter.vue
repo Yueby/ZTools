@@ -15,12 +15,17 @@
 
       <!-- 插件列表 -->
       <div class="plugin-list">
-        <div v-for="plugin in plugins" :key="plugin.path" class="plugin-item">
+        <div
+          v-for="plugin in plugins"
+          :key="plugin.path"
+          class="plugin-item"
+          :title="plugin.description"
+          @click="openPluginDetail(plugin)">
           <img v-if="plugin.logo" :src="plugin.logo" class="plugin-icon" alt="插件图标" />
           <div v-else class="plugin-icon-placeholder">🧩</div>
 
           <div class="plugin-info">
-            <div class="plugin-name" title="查看详情" @click="openPluginDetail(plugin)">
+            <div class="plugin-name">
               {{ plugin.name }}
               <span class="plugin-version">v{{ plugin.version }}</span>
               <span v-if="plugin.isDevelopment" class="dev-badge">开发中</span>
@@ -33,7 +38,11 @@
           </div>
 
           <div class="plugin-meta">
-            <button class="icon-btn open-btn" title="打开插件" @click="handleOpenPlugin(plugin)">
+            <button
+              class="icon-btn open-btn"
+              title="打开插件"
+              @click.stop="handleOpenPlugin(plugin)"
+            >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="14"
@@ -53,7 +62,7 @@
               class="icon-btn kill-btn"
               title="终止运行"
               :disabled="isKilling"
-              @click="handleKillPlugin(plugin)"
+              @click.stop="handleKillPlugin(plugin)"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -73,7 +82,7 @@
               class="icon-btn reload-btn"
               :disabled="isReloading"
               title="重新加载 plugin.json 配置文件"
-              @click="handleReloadPlugin(plugin)"
+              @click.stop="handleReloadPlugin(plugin)"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -97,7 +106,7 @@
               class="icon-btn delete-btn"
               title="删除插件"
               :disabled="isDeleting"
-              @click="handleDeletePlugin(plugin)"
+              @click.stop="handleDeletePlugin(plugin)"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -435,6 +444,7 @@ function closePluginDetail(): void {
   border: 1px solid var(--border-color);
   border-radius: 8px;
   transition: all 0.2s;
+  cursor: pointer;
 }
 
 .plugin-item:hover {
@@ -476,7 +486,6 @@ function closePluginDetail(): void {
   display: flex;
   align-items: center;
   gap: 8px;
-  cursor: pointer;
 }
 
 .plugin-version {

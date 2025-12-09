@@ -8,41 +8,43 @@
       <div class="topbar-title">插件详情</div>
     </div>
 
-    <div class="detail-content">
-      <div class="detail-header">
-        <img v-if="plugin.logo" :src="plugin.logo" class="detail-icon" alt="插件图标" />
-        <div v-else class="detail-icon placeholder">🧩</div>
-        <div class="detail-title">
-          <div class="detail-name">{{ plugin.name }}</div>
-          <div class="detail-version">v{{ plugin.version }}</div>
-        </div>
-        <div class="detail-actions">
-          <button class="open-btn" @click="emit('open')">打开</button>
-        </div>
-      </div>
-    </div>
-
-    <div class="detail-desc">{{ plugin.description || '暂无描述' }}</div>
-
-    <div class="detail-section">
-      <div class="detail-section-title">指令列表</div>
-      <div v-if="plugin.features && plugin.features.length > 0" class="feature-list">
-        <div v-for="feature in plugin.features" :key="feature.code" class="feature-item">
-          <div class="feature-title">{{ feature.explain || feature.code }}</div>
-          <div class="cmd-list">
-            <span
-              v-for="cmd in feature.cmds"
-              :key="cmdKey(cmd)"
-              class="cmd-chip"
-              :class="isMatchCmd(cmd) ? `type-${cmdType(cmd)}` : ''"
-            >
-              <span class="cmd-text">{{ cmdLabel(cmd) }}</span>
-              <span v-if="isMatchCmd(cmd)" class="cmd-badge">{{ cmdTypeBadge(cmd) }}</span>
-            </span>
+    <div class="detail-scrollable">
+      <div class="detail-content">
+        <div class="detail-header">
+          <img v-if="plugin.logo" :src="plugin.logo" class="detail-icon" alt="插件图标" />
+          <div v-else class="detail-icon placeholder">🧩</div>
+          <div class="detail-title">
+            <div class="detail-name">{{ plugin.name }}</div>
+            <div class="detail-version">v{{ plugin.version }}</div>
+          </div>
+          <div class="detail-actions">
+            <button class="open-btn" @click="emit('open')">打开</button>
           </div>
         </div>
       </div>
-      <div v-else class="empty-feature">暂无指令</div>
+
+      <div class="detail-desc">{{ plugin.description || '暂无描述' }}</div>
+
+      <div class="detail-section">
+        <div class="detail-section-title">指令列表</div>
+        <div v-if="plugin.features && plugin.features.length > 0" class="feature-list">
+          <div v-for="feature in plugin.features" :key="feature.code" class="feature-item">
+            <div class="feature-title">{{ feature.explain || feature.code }}</div>
+            <div class="cmd-list">
+              <span
+                v-for="cmd in feature.cmds"
+                :key="cmdKey(cmd)"
+                class="cmd-chip"
+                :class="isMatchCmd(cmd) ? `type-${cmdType(cmd)}` : ''"
+              >
+                <span class="cmd-text">{{ cmdLabel(cmd) }}</span>
+                <span v-if="isMatchCmd(cmd)" class="cmd-badge">{{ cmdTypeBadge(cmd) }}</span>
+              </span>
+            </div>
+          </div>
+        </div>
+        <div v-else class="empty-feature">暂无指令</div>
+      </div>
     </div>
   </div>
 </template>
@@ -143,9 +145,14 @@ function cmdTypeBadge(cmd: any): string {
   color: var(--text-secondary);
 }
 
+.detail-scrollable {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
 .detail-content {
   padding: 16px;
-  overflow: auto;
 }
 
 .detail-header {

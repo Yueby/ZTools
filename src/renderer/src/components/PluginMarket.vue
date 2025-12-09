@@ -7,12 +7,18 @@
         <span>加载中...</span>
       </div>
       <div v-else class="market-grid">
-        <div v-for="plugin in plugins" :key="plugin.name" class="plugin-card">
+        <div
+          v-for="plugin in plugins"
+          :key="plugin.name"
+          class="plugin-card"
+          :title="plugin.description"
+          @click="openPluginDetail(plugin)"
+        >
           <div class="plugin-icon">
             <img :src="plugin.logo" class="plugin-logo-img" alt="icon" />
           </div>
           <div class="plugin-info">
-            <div class="plugin-name" @click="openPluginDetail(plugin)">{{ plugin.name }}</div>
+            <div class="plugin-name">{{ plugin.name }}</div>
             <div class="plugin-description" :title="plugin.description">
               {{ plugin.description }}
             </div>
@@ -23,12 +29,12 @@
                 v-if="canUpgrade(plugin)"
                 class="action-btn upgrade"
                 :disabled="installingPlugin === plugin.name"
-                @click="handleUpgradePlugin(plugin)"
+                @click.stop="handleUpgradePlugin(plugin)"
               >
                 <span v-if="installingPlugin === plugin.name">...</span>
                 <span v-else>升级</span>
               </button>
-              <button v-else class="action-btn installed" @click="handleOpenPlugin(plugin)">
+              <button v-else class="action-btn installed" @click.stop="handleOpenPlugin(plugin)">
                 打开
               </button>
             </template>
@@ -36,7 +42,7 @@
               v-else
               class="action-btn download"
               :disabled="installingPlugin === plugin.name"
-              @click="downloadPlugin(plugin)"
+              @click.stop="downloadPlugin(plugin)"
             >
               <span v-if="installingPlugin === plugin.name">...</span>
               <svg
