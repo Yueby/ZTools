@@ -33,6 +33,7 @@ declare global {
         identifier: string,
         type?: 'name' | 'bundleId' | 'path'
       ) => Promise<{ success: boolean; error?: string }>
+      revealInFinder: (filePath: string) => Promise<void>
       showContextMenu: (menuItems: any[]) => Promise<void>
       getPlugins: () => Promise<any[]>
       importPlugin: () => Promise<{ success: boolean; error?: string }>
@@ -174,4 +175,5 @@ declare global {
   }
 }
 
-export { }
+export { };
+

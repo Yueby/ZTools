@@ -1,11 +1,53 @@
 <template>
-  <div class="app-list">
-    <div class="app-grid">
+  <div ref="listRef" class="app-list">
+    <!-- 可拖拽列表 -->
+    <Draggable
+      v-if="props.draggable"
+      v-model="localApps"
+      class="app-grid"
+      item-key="path"
+      :animation="200"
+      ghost-class="ghost"
+      chosen-class="chosen"
+      @end="onDragEnd"
+    >
+      <template #item="{ element: app, index }">
+        <div
+          :ref="(el) => setItemRef(el, index)"
+          class="app-item"
+          :class="{ selected: index === selectedIndex }"
+          style="cursor: move;"
+          @click="$emit('select', app)"
+          @contextmenu.prevent="$emit('contextmenu', app)"
+        >
+          <!-- Emoji 图标 (单个字符) -->
+          <div v-if="app.icon && app.icon.length <= 2" class="app-icon-emoji">
+            {{ app.icon }}
+          </div>
+          <!-- 图片图标 (base64) -->
+          <img
+            v-else-if="app.icon"
+            :src="app.icon"
+            class="app-icon"
+            @error="(e) => onIconError(e, app)"
+          />
+          <!-- 占位图标 -->
+          <div v-else class="app-icon-placeholder">
+            {{ app.name.charAt(0).toUpperCase() }}
+          </div>
+          <span class="app-name" v-html="getHighlightedName(app)"></span>
+        </div>
+      </template>
+    </Draggable>
+    <!-- 普通列表 -->
+    <div v-if="!props.draggable" class="app-grid">
       <div
         v-for="(app, index) in apps"
         :key="app.path"
+        :ref="(el) => setItemRef(el, index)"
         class="app-item"
         :class="{ selected: index === selectedIndex }"
+        draggable="false"
         @click="$emit('select', app)"
         @contextmenu.prevent="$emit('contextmenu', app)"
       >
@@ -34,6 +76,8 @@
 </template>
 
 <script setup lang="ts">
+import { computed, nextTick, ref, watch, type ComponentPublicInstance } from 'vue'
+import Draggable from 'vuedraggable'
 import { highlightMatch } from '../utils/highlight'
 
 interface MatchInfo {
@@ -49,16 +93,84 @@ interface App {
   matches?: MatchInfo[]
 }
 
-defineProps<{
-  apps: App[]
-  selectedIndex: number
-  emptyText?: string
-}>()
+const props = withDefaults(
+  defineProps<{
+    apps: App[]
+    selectedIndex: number
+    emptyText?: string
+    draggable?: boolean
+  }>(),
+  {
+    emptyText: '',
+    draggable: false
+  }
+)
 
-defineEmits<{
+const emit = defineEmits<{
   (e: 'select', app: App): void
   (e: 'contextmenu', app: App): void
+  (e: 'update:apps', apps: App[]): void
 }>()
+
+// 可拖拽列表的数据绑定
+const localApps = computed({
+  get: () => props.apps,
+  set: (value) => emit('update:apps', value)
+})
+
+function onDragEnd(): void {
+  // 拖动结束后自动通过 v-model 更新
+}
+
+const listRef = ref<HTMLElement>()
+const itemRefs = ref<(HTMLElement | null)[]>([])
+
+function setItemRef(el: Element | ComponentPublicInstance | null, index: number): void {
+  if (el instanceof HTMLElement) {
+    itemRefs.value[index] = el
+  }
+}
+
+// 滚动到指定索引的项目
+function scrollToIndex(index: number): void {
+  if (!listRef.value || index < 0 || index >= itemRefs.value.length) {
+    return
+  }
+
+  const targetElement = itemRefs.value[index]
+  if (!targetElement) {
+    return
+  }
+
+  const container = listRef.value
+  const containerRect = container.getBoundingClientRect()
+  const targetRect = targetElement.getBoundingClientRect()
+
+  // 检查是否在可见区域内
+  const isAbove = targetRect.top < containerRect.top
+  const isBelow = targetRect.bottom > containerRect.bottom
+
+  if (isAbove) {
+    // 项目在上方，滚动到顶部对齐
+    container.scrollTop = targetElement.offsetTop - container.offsetTop
+  } else if (isBelow) {
+    // 项目在下方，滚动到底部对齐
+    container.scrollTop =
+      targetElement.offsetTop - container.offsetTop - container.clientHeight + targetElement.offsetHeight
+  }
+}
+
+// 监听选中索引变化，自动滚动
+watch(
+  () => props.selectedIndex,
+  (newIndex) => {
+    if (newIndex >= 0) {
+      nextTick(() => {
+        scrollToIndex(newIndex)
+      })
+    }
+  }
+)
 
 function getHighlightedName(app: App): string {
   return highlightMatch(app.name, app.matches)
@@ -69,6 +181,11 @@ function onIconError(event: Event, app: App): void {
   ;(event.target as HTMLImageElement).style.display = 'none'
   console.warn(`无法加载图标: ${app.name}`)
 }
+
+// 暴露方法供父组件调用
+defineExpose({
+  scrollToIndex
+})
 </script>
 
 <style scoped>
@@ -81,6 +198,7 @@ function onIconError(event: Event, app: App): void {
 .app-grid {
   display: grid;
   grid-template-columns: repeat(9, 1fr); /* 每行 9 个 */
+  gap: 4px; /* 项目之间的间隙 */
 }
 
 .app-item {
@@ -93,6 +211,29 @@ function onIconError(event: Event, app: App): void {
   transition: background 0.15s;
   width: 100%; /* 占满格子宽度 */
   overflow: hidden;
+  user-select: none; /* 禁止文本选择 */
+}
+
+/* 拖动时的样式 */
+.ghost {
+  opacity: 0.5;
+  background: var(--border-color);
+}
+
+.chosen {
+  opacity: 0.8;
+}
+
+/* 拖拽模式下，图标和文本防止阻止拖动 */
+:deep(.ghost .app-icon),
+:deep(.ghost .app-icon-emoji),
+:deep(.ghost .app-icon-placeholder),
+:deep(.ghost .app-name),
+:deep(.chosen .app-icon),
+:deep(.chosen .app-icon-emoji),
+:deep(.chosen .app-icon-placeholder),
+:deep(.chosen .app-name) {
+  pointer-events: none;
 }
 
 .app-item:hover {
@@ -104,27 +245,27 @@ function onIconError(event: Event, app: App): void {
 }
 
 .app-icon {
-  width: 48px;
-  height: 48px;
+  width: 40px;
+  height: 40px;
   margin-bottom: 8px;
   border-radius: 8px;
   flex-shrink: 0;
 }
 
 .app-icon-emoji {
-  width: 48px;
-  height: 48px;
+  width: 40px;
+  height: 40px;
   margin-bottom: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 32px;
+  font-size: 28px;
   flex-shrink: 0;
 }
 
 .app-icon-placeholder {
-  width: 48px;
-  height: 48px;
+  width: 40px;
+  height: 40px;
   margin-bottom: 8px;
   border-radius: 8px;
   background: var(--primary-gradient);
@@ -132,7 +273,7 @@ function onIconError(event: Event, app: App): void {
   align-items: center;
   justify-content: center;
   color: var(--text-on-primary);
-  font-size: 20px;
+  font-size: 18px;
   font-weight: bold;
   flex-shrink: 0;
 }
@@ -152,6 +293,14 @@ function onIconError(event: Event, app: App): void {
   word-break: break-all; /* 允许在任意字符间断行 */
 }
 
+/* 拖拽模式下，图标和文本防止阻止拖动 */
+:deep(.app-item[draggable] .app-icon),
+:deep(.app-item[draggable] .app-icon-emoji),
+:deep(.app-item[draggable] .app-icon-placeholder),
+:deep(.app-item[draggable] .app-name) {
+  pointer-events: none;
+}
+
 .empty-state {
   padding: 40px;
   text-align: center;
@@ -161,20 +310,32 @@ function onIconError(event: Event, app: App): void {
 
 /* 自定义滚动条 */
 .app-list::-webkit-scrollbar {
-  width: 6px;
+  width: 8px;
 }
 
 .app-list::-webkit-scrollbar-track {
   background: transparent;
+  margin: 4px 0;
 }
 
 .app-list::-webkit-scrollbar-thumb {
   background: var(--border-color);
-  border-radius: 3px;
+  border-radius: 4px;
+  transition: background 0.2s ease;
+  background-clip: padding-box;
+  border: 2px solid transparent;
 }
 
 .app-list::-webkit-scrollbar-thumb:hover {
   background: var(--text-secondary);
+  background-clip: padding-box;
+  border: 2px solid transparent;
+}
+
+.app-list::-webkit-scrollbar-thumb:active {
+  background: var(--text-color);
+  background-clip: padding-box;
+  border: 1px solid transparent;
 }
 
 /* 高亮样式 */

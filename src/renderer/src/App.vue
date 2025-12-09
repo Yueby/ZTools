@@ -4,10 +4,9 @@
       <SearchBox
         ref="searchBoxRef"
         v-model="searchQuery"
+        :current-view="currentView"
         @composing="handleComposing"
-        @settings-click="
-          currentView = currentView === ViewMode.Settings ? ViewMode.Search : ViewMode.Settings
-        "
+        @settings-click="handleSettingsClick"
       />
 
       <!-- 搜索结果组件 -->
@@ -30,12 +29,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue'
+import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import SearchBox from './components/SearchBox.vue'
 import SearchResults from './components/SearchResults.vue'
 import Settings from './components/Settings.vue'
-import { useWindowStore } from './stores/windowStore'
 import { useAppDataStore } from './stores/appDataStore'
+import { useWindowStore } from './stores/windowStore'
 
 enum ViewMode {
   Search = 'search',
@@ -77,6 +76,17 @@ function updateWindowHeight(): Promise<void> {
 // 处理输入法组合状态
 function handleComposing(composing: boolean): void {
   isComposing.value = composing
+}
+
+// 处理设置按钮点击
+function handleSettingsClick(): void {
+  console.log('收到设置点击事件，当前视图:', currentView.value)
+  if (currentView.value === ViewMode.Settings) {
+    currentView.value = ViewMode.Search
+  } else {
+    currentView.value = ViewMode.Settings
+  }
+  console.log('切换后视图:', currentView.value)
 }
 
 // 监听显示设置页面的变化,调整窗口高度

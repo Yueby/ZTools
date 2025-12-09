@@ -1,96 +1,79 @@
 <template>
-  <div class="scrollable-content">
+  <div ref="scrollContainerRef" class="scrollable-content">
     <!-- 无搜索时显示历史 -->
     <div v-if="!searchQuery.trim()" class="content-section">
       <!-- 最近使用 -->
-      <div v-if="displayApps.length > 0">
-        <div class="section-header">
-          <div class="section-title">最近使用</div>
-          <div
-            v-if="displayApps.length > 18"
-            class="expand-btn"
-            @click="isRecentExpanded = !isRecentExpanded"
-          >
-            {{ isRecentExpanded ? '收起' : `展开 (${displayApps.length})` }}
-          </div>
-        </div>
-        <AppList
-          :apps="visibleRecentApps"
-          :selected-index="getAbsoluteIndexForSection('apps')"
-          :empty-text="loading ? '正在加载应用...' : '未找到应用'"
-          @select="handleSelectApp"
-          @contextmenu="handleAppContextMenu"
-        />
-      </div>
+      <CollapsibleList
+        v-model:expanded="isRecentExpanded"
+        title="最近使用"
+        :apps="displayApps"
+        :selected-index="getAbsoluteIndexForSection('apps')"
+        :empty-text="loading ? '正在加载应用...' : '未找到应用'"
+        :draggable="false"
+        @select="handleSelectApp"
+        @contextmenu="handleAppContextMenu"
+      />
 
       <!-- 固定栏 -->
-      <div v-if="pinnedApps.length > 0" class="pinned-section">
-        <div class="section-header">
-          <div class="section-title">固定</div>
-          <div
-            v-if="pinnedApps.length > 18"
-            class="expand-btn"
-            @click="isPinnedExpanded = !isPinnedExpanded"
-          >
-            {{ isPinnedExpanded ? '收起' : `展开 (${pinnedApps.length})` }}
-          </div>
-        </div>
-        <DraggableAppList
-          :apps="visiblePinnedApps"
-          :selected-index="getAbsoluteIndexForSection('pinned')"
-          :empty-text="''"
-          @select="handleSelectApp"
-          @contextmenu="(app) => handleAppContextMenu(app, false, true)"
-          @update:apps="handlePinnedOrderUpdate"
-        />
-      </div>
+      <CollapsibleList
+        v-model:expanded="isPinnedExpanded"
+        title="固定"
+        :apps="pinnedApps"
+        :selected-index="getAbsoluteIndexForSection('pinned')"
+        :draggable="true"
+        @select="handleSelectApp"
+        @contextmenu="(app) => handleAppContextMenu(app, false, true)"
+        @update:apps="updatePinnedOrder"
+      />
 
       <!-- 访达 -->
-      <div v-if="finderActions.length > 0" class="result-section">
-        <div class="section-title">访达</div>
-        <AppList
-          :apps="finderActions"
-          :selected-index="getAbsoluteIndexForSection('finder')"
-          :empty-text="''"
-          @select="handleFinderAction"
-        />
-      </div>
+      <CollapsibleList
+        v-if="finderActions.length > 0"
+        title="访达"
+        :apps="finderActions"
+        :selected-index="getAbsoluteIndexForSection('finder')"
+        :empty-text="''"
+        :draggable="false"
+        @select="handleFinderAction"
+      />
     </div>
 
     <!-- 有搜索时显示搜索结果 -->
     <div v-else class="search-results">
       <!-- 最佳匹配 -->
-      <div v-if="internalSearchResults.length > 0" class="result-section">
-        <div class="section-title">最佳匹配</div>
-        <AppList
-          :apps="internalSearchResults"
-          :selected-index="searchResultSelectedIndex"
-          :empty-text="'未找到应用'"
-          @select="handleSelectApp"
-          @contextmenu="(app) => handleAppContextMenu(app, true)"
-        />
-      </div>
+      <CollapsibleList
+        v-if="internalSearchResults.length > 0"
+        v-model:expanded="isSearchResultsExpanded"
+        title="最佳匹配"
+        :apps="internalSearchResults"
+        :selected-index="searchResultSelectedIndex"
+        :empty-text="'未找到应用'"
+        :default-visible-rows="2"
+        :draggable="false"
+        @select="handleSelectApp"
+        @contextmenu="(app) => handleAppContextMenu(app, true)"
+      />
 
       <!-- 匹配推荐 -->
-      <div class="result-section">
-        <div class="section-title">匹配推荐</div>
-        <AppList
-          :apps="recommendations"
-          :selected-index="recommendationSelectedIndex"
-          :empty-text="''"
-          @select="handleRecommendationSelect"
-        />
-      </div>
+      <CollapsibleList
+        v-model:expanded="isRecommendationsExpanded"
+        title="匹配推荐"
+        :apps="recommendations"
+        :selected-index="recommendationSelectedIndex"
+        :empty-text="''"
+        :default-visible-rows="2"
+        :draggable="false"
+        @select="handleRecommendationSelect"
+      />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, nextTick } from 'vue'
-import AppList from './AppList.vue'
-import DraggableAppList from './DraggableAppList.vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useAppDataStore } from '../stores/appDataStore'
 import { useWindowStore } from '../stores/windowStore'
+import CollapsibleList from './common/CollapsibleList.vue'
 
 interface Props {
   searchQuery: string
@@ -123,6 +106,9 @@ const selectedRow = ref(0)
 const selectedCol = ref(0)
 const isRecentExpanded = ref(false)
 const isPinnedExpanded = ref(false)
+const isSearchResultsExpanded = ref(false)
+const isRecommendationsExpanded = ref(false)
+const scrollContainerRef = ref<HTMLElement>()
 
 // 搜索结果
 const internalSearchResults = computed(() => {
@@ -184,20 +170,20 @@ const pinnedApps = computed(() => {
   return getPinnedApps()
 })
 
-// 可见的最近使用应用
+// 可见的最近使用应用（用于键盘导航）
 const visibleRecentApps = computed(() => {
   if (isRecentExpanded.value) {
     return displayApps.value
   }
-  return displayApps.value.slice(0, 18)
+  return displayApps.value.slice(0, 9)
 })
 
-// 可见的固定应用
+// 可见的固定应用（用于键盘导航）
 const visiblePinnedApps = computed(() => {
   if (isPinnedExpanded.value) {
     return pinnedApps.value
   }
-  return pinnedApps.value.slice(0, 18)
+  return pinnedApps.value.slice(0, 9)
 })
 
 // 将一维数组转换为二维数组(每行9个)
@@ -209,21 +195,37 @@ function arrayToGrid(arr: any[], cols = 9): any[][] {
   return grid
 }
 
+// 可见的搜索结果（用于键盘导航）
+const visibleSearchResults = computed(() => {
+  if (isSearchResultsExpanded.value) {
+    return internalSearchResults.value
+  }
+  return internalSearchResults.value.slice(0, 18) // 默认显示2行（18个）
+})
+
+// 可见的推荐列表（用于键盘导航）
+const visibleRecommendations = computed(() => {
+  if (isRecommendationsExpanded.value) {
+    return recommendations.value
+  }
+  return recommendations.value.slice(0, 18) // 默认显示2行（18个）
+})
+
 // 构建导航网格
 const navigationGrid = computed(() => {
   const sections: any[] = []
 
   if (props.searchQuery.trim()) {
     // 有搜索时：搜索结果 + 推荐
-    if (internalSearchResults.value.length > 0) {
-      const searchGrid = arrayToGrid(internalSearchResults.value)
+    if (visibleSearchResults.value.length > 0) {
+      const searchGrid = arrayToGrid(visibleSearchResults.value)
       searchGrid.forEach((row) => {
         sections.push({ type: 'search', items: row })
       })
     }
 
-    if (recommendations.value.length > 0) {
-      const recommendGrid = arrayToGrid(recommendations.value)
+    if (visibleRecommendations.value.length > 0) {
+      const recommendGrid = arrayToGrid(visibleRecommendations.value)
       recommendGrid.forEach((row) => {
         sections.push({ type: 'recommendation', items: row })
       })
@@ -315,11 +317,88 @@ watch(
 )
 
 // 监听展开状态变化，调整窗口高度
-watch([isRecentExpanded, isPinnedExpanded], () => {
+watch(
+  [isRecentExpanded, isPinnedExpanded, isSearchResultsExpanded, isRecommendationsExpanded],
+  () => {
+    nextTick(() => {
+      emit('height-changed')
+    })
+  }
+)
+
+// 滚动到选中的项
+function scrollToSelectedItem(): void {
+  const container = scrollContainerRef.value
+  if (!container) {
+    return
+  }
+
   nextTick(() => {
-    emit('height-changed')
+    // 查找所有选中的项
+    const selectedElements = container.querySelectorAll('.app-item.selected')
+    if (!selectedElements || selectedElements.length === 0) {
+      return
+    }
+
+    // 获取第一个选中的项（应该只有一个）
+    const selectedElement = selectedElements[0] as HTMLElement
+    if (!selectedElement) {
+      return
+    }
+
+    const containerRect = container.getBoundingClientRect()
+    const targetRect = selectedElement.getBoundingClientRect()
+
+    // 检查是否在可见区域内
+    const isAbove = targetRect.top < containerRect.top
+    const isBelow = targetRect.bottom > containerRect.bottom
+
+    if (isAbove) {
+      // 项目在上方，滚动到顶部对齐
+      const scrollTop = container.scrollTop + (targetRect.top - containerRect.top) - 10 // 留一点边距
+      container.scrollTo({
+        top: Math.max(0, scrollTop),
+        behavior: 'smooth'
+      })
+    } else if (isBelow) {
+      // 项目在下方，滚动到底部对齐
+      const scrollTop =
+        container.scrollTop + (targetRect.bottom - containerRect.bottom) + 10 // 留一点边距
+      container.scrollTo({
+        top: scrollTop,
+        behavior: 'smooth'
+      })
+    }
   })
-})
+}
+
+// 监听选中项变化，自动滚动
+watch(
+  [selectedRow, selectedCol],
+  () => {
+    scrollToSelectedItem()
+  }
+)
+
+// 监听固定列表变化，调整窗口高度（特别是从空到非空或从非空到空时）
+watch(
+  () => pinnedApps.value.length,
+  () => {
+    nextTick(() => {
+      emit('height-changed')
+    })
+  }
+)
+
+// 监听历史记录列表变化，调整窗口高度
+watch(
+  () => displayApps.value.length,
+  () => {
+    nextTick(() => {
+      emit('height-changed')
+    })
+  }
+)
 
 // 监听 grid 变化，修正选中位置（主要是为了处理折叠/展开时的边界情况）
 watch(navigationGrid, (newGrid) => {
@@ -339,20 +418,6 @@ watch(navigationGrid, (newGrid) => {
   }
 })
 
-// 处理固定应用排序更新
-function handlePinnedOrderUpdate(newOrder: any[]): void {
-  if (isPinnedExpanded.value) {
-    // 展开状态下，直接更新
-    updatePinnedOrder(newOrder)
-  } else {
-    // 折叠状态下，newOrder 只是前 18 个
-    // 需要保留后面的应用
-    const hiddenApps = pinnedApps.value.slice(18)
-    const fullList = [...newOrder, ...hiddenApps]
-    updatePinnedOrder(fullList)
-  }
-}
-
 // 处理应用右键菜单
 async function handleAppContextMenu(
   app: any,
@@ -366,6 +431,14 @@ async function handleAppContextMenu(
     menuItems.push({
       id: `remove-from-history:${JSON.stringify({ path: app.path, featureCode: app.featureCode })}`,
       label: '从使用记录删除'
+    })
+  }
+
+  // 如果是应用（不是插件），显示"打开文件位置"
+  if (app.type !== 'plugin' && app.path && !app.path.startsWith('baidu-search:')) {
+    menuItems.push({
+      id: `reveal-in-finder:${JSON.stringify({ path: app.path })}`,
+      label: '打开文件位置'
     })
   }
 
@@ -476,16 +549,29 @@ async function handleKeydown(event: KeyboardEvent): Promise<void> {
       }
       break
     case 'ArrowRight':
+      event.preventDefault()
       if (grid.length > 0 && selectedRow.value < grid.length) {
         const currentRowItems = grid[selectedRow.value].items
         if (selectedCol.value < currentRowItems.length - 1) {
+          // 当前行还有下一个项目
           selectedCol.value++
+        } else if (selectedRow.value < grid.length - 1) {
+          // 当前行最后一个，跳到下一行第一个
+          selectedRow.value++
+          selectedCol.value = 0
         }
       }
       break
     case 'ArrowLeft':
+      event.preventDefault()
       if (selectedCol.value > 0) {
+        // 当前行还有前一个项目
         selectedCol.value--
+      } else if (selectedRow.value > 0) {
+        // 当前行第一个，跳到上一行最后一个
+        selectedRow.value--
+        const prevRowItems = grid[selectedRow.value].items
+        selectedCol.value = prevRowItems.length - 1
       }
       break
     case 'Enter': {
@@ -541,6 +627,14 @@ async function handleContextMenuCommand(command: string): Promise<void> {
     } catch (error) {
       console.error('取消固定失败:', error)
     }
+  } else if (command.startsWith('reveal-in-finder:')) {
+    const jsonStr = command.replace('reveal-in-finder:', '')
+    try {
+      const { path: filePath } = JSON.parse(jsonStr)
+      await window.ztools.revealInFinder(filePath)
+    } catch (error) {
+      console.error('打开文件位置失败:', error)
+    }
   }
 }
 
@@ -573,20 +667,34 @@ defineExpose({
 
 /* 自定义滚动条 */
 .scrollable-content::-webkit-scrollbar {
-  width: 6px;
+  width: 8px;
 }
 
 .scrollable-content::-webkit-scrollbar-track {
   background: transparent;
+  margin: 4px 0; /* 上下留出间距 */
 }
 
 .scrollable-content::-webkit-scrollbar-thumb {
   background: var(--border-color);
-  border-radius: 3px;
+  border-radius: 4px;
+  transition: background 0.2s ease;
+  /* 添加一点内边距效果 */
+  background-clip: padding-box;
+  border: 2px solid transparent;
 }
 
 .scrollable-content::-webkit-scrollbar-thumb:hover {
   background: var(--text-secondary);
+  background-clip: padding-box;
+  border: 2px solid transparent;
+}
+
+/* 滚动时的样式 */
+.scrollable-content::-webkit-scrollbar-thumb:active {
+  background: var(--text-color);
+  background-clip: padding-box;
+  border: 1px solid transparent;
 }
 
 .content-section {
@@ -603,35 +711,11 @@ defineExpose({
   flex-direction: column;
 }
 
-.pinned-section {
-  display: flex;
-  flex-direction: column;
-}
-
-.section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding-right: 10px;
-}
-
 .section-title {
   font-size: 14px;
   font-weight: 600;
   color: var(--text-secondary);
   padding: 5px 10px;
-}
-
-.expand-btn {
-  font-size: 12px;
-  color: var(--primary-color);
-  cursor: pointer;
-  padding: 2px 6px;
-  border-radius: 4px;
-  transition: all 0.2s;
-}
-
-.expand-btn:hover {
-  background: var(--hover-bg);
+  margin-bottom: 4px; /* 与结果项间距保持一致 */
 }
 </style>

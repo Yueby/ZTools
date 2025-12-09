@@ -31,6 +31,7 @@ contextBridge.exposeInMainWorld('ztools', {
   getFrontmostApp: () => ipcRenderer.invoke('get-frontmost-app'),
   activateApp: (identifier: string, type?: 'name' | 'bundleId' | 'path') =>
     ipcRenderer.invoke('activate-app', identifier, type),
+  revealInFinder: (filePath: string) => ipcRenderer.invoke('reveal-in-finder', filePath),
   showContextMenu: (menuItems: any[]) => ipcRenderer.invoke('show-context-menu', menuItems),
   getPlugins: () => ipcRenderer.invoke('get-plugins'),
   importPlugin: () => ipcRenderer.invoke('import-plugin'),

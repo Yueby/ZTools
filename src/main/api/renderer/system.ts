@@ -1,4 +1,4 @@
-import { ipcMain, shell, clipboard, Menu, dialog, app } from 'electron'
+import { app, clipboard, dialog, ipcMain, Menu, shell } from 'electron'
 import { promises as fs } from 'fs'
 import path from 'path'
 import clipboardManager from '../../clipboardManager.js'
@@ -34,6 +34,7 @@ export class SystemAPI {
     ipcMain.handle('activate-app', (_event, identifier: string, type?: string) =>
       this.activateApp(identifier, type)
     )
+    ipcMain.handle('reveal-in-finder', (_event, filePath: string) => this.revealInFinder(filePath))
 
     // UI
     ipcMain.handle('show-context-menu', (_event, menuItems) => this.showContextMenu(menuItems))
@@ -130,6 +131,31 @@ export class SystemAPI {
     } catch (error: any) {
       console.error('激活应用失败:', error)
       return { success: false, error: error.message || '未知错误' }
+    }
+  }
+
+  /**
+   * 在文件管理器中显示文件位置（跨平台）
+   * macOS: 在 Finder 中显示并选中文件
+   * Windows: 在资源管理器中显示并选中文件
+   * Linux: 在文件管理器中显示并选中文件
+   * 
+   * Electron 的 shell.showItemInFolder() 是跨平台的 API，
+   * 会自动根据操作系统选择相应的文件管理器
+   */
+  private async revealInFinder(filePath: string): Promise<void> {
+    try {
+      if (!filePath) {
+        throw new Error('文件路径不能为空')
+      }
+
+      // Electron 的 shell.showItemInFolder() 是跨平台的
+      // 在 macOS 上会自动使用 Finder，Windows 上使用资源管理器，Linux 上使用文件管理器
+      shell.showItemInFolder(filePath)
+    } catch (error: any) {
+      const platformName = process.platform === 'darwin' ? 'macOS' : process.platform === 'win32' ? 'Windows' : 'Linux'
+      console.error(`在${platformName}文件管理器中显示文件失败:`, error)
+      throw error
     }
   }
 

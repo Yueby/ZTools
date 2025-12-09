@@ -3,49 +3,32 @@
     <!-- 隐藏的测量元素,用于计算文本宽度 -->
     <div class="search-input-container">
       <span ref="measureRef" class="measure-text"></span>
-      <input
-        ref="inputRef"
-        type="text"
-        :value="modelValue"
-        :placeholder="placeholderText"
-        class="search-input"
-        @input="onInput"
-        @compositionstart="onCompositionStart"
-        @compositionend="onCompositionEnd"
-        @keydown="onKeydown"
-      />
+      <input ref="inputRef" type="text" :value="modelValue" :placeholder="placeholderText" class="search-input"
+        @input="onInput" @compositionstart="onCompositionStart" @compositionend="onCompositionEnd"
+        @keydown="onKeydown" />
     </div>
     <!-- 操作栏 -->
     <div class="search-actions">
       <!-- 更新提示（有下载好的更新时显示） -->
-      <div
-        v-if="windowStore.updateDownloadInfo.hasDownloaded && !windowStore.currentPlugin"
-        class="update-notification"
-        @click="handleUpdateClick"
-      >
+      <div v-if="windowStore.updateDownloadInfo.hasDownloaded && !windowStore.currentPlugin" class="update-notification"
+        @click="handleUpdateClick">
         <span class="update-text">新版本已下载，点击升级</span>
         <UpdateIcon />
       </div>
       <!-- 头像按钮（无更新或插件模式时显示） -->
-      <img
-        v-else
-        :src="avatarUrl"
-        height="36"
-        width="36"
-        class="search-btn"
-        @click="handleSettingsClick"
-      />
+      <img v-else :src="avatarUrl" height="36" width="36" class="search-btn" @click="handleSettingsClick" />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, nextTick } from 'vue'
-import { useWindowStore } from '../stores/windowStore'
-import UpdateIcon from './UpdateIcon.vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { useWindowStore } from '../stores/windowStore';
+import UpdateIcon from './UpdateIcon.vue';
 
 const props = defineProps<{
   modelValue: string
+  currentView?: string
 }>()
 
 const emit = defineEmits<{
@@ -171,8 +154,14 @@ onMounted(() => {
 })
 
 async function handleSettingsClick(): Promise<void> {
-  // 如果当前有插件激活，显示插件菜单
-  if (windowStore.currentPlugin) {
+  console.log('点击设置按钮:', {
+    currentView: props.currentView,
+    currentPlugin: windowStore.currentPlugin
+  })
+
+  // 只有在插件视图真正显示时才显示插件菜单
+  if (props.currentView === 'plugin' && windowStore.currentPlugin) {
+    console.log('显示插件菜单')
     const menuItems = [
       { id: 'open-devtools', label: '打开开发者工具' },
       { id: 'kill-plugin', label: '结束运行' }
@@ -181,6 +170,7 @@ async function handleSettingsClick(): Promise<void> {
     await window.ztools.showContextMenu(menuItems)
   } else {
     // 否则打开设置页面
+    console.log('触发设置点击事件')
     emit('settings-click')
   }
 }
@@ -214,9 +204,7 @@ defineExpose({
 <style scoped>
 .search-box {
   padding: 5px 15px;
-  padding: 5px 15px;
-  border-bottom: 1px solid var(--border-color);
-  display: flex;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -257,6 +245,7 @@ defineExpose({
 
 .search-input::placeholder {
   color: var(--placeholder-color);
+  font-size: 22px;
 }
 
 .search-input-container {
