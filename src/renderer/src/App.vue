@@ -91,6 +91,18 @@ function handleSettingsClick(): void {
   console.log('切换后视图:', currentView.value)
 }
 
+// 分离当前插件到独立窗口
+async function detachCurrentPlugin(): Promise<void> {
+  try {
+    const result = await window.ztools.detachPlugin()
+    if (!result.success) {
+      console.error('分离插件失败:', result.error)
+    }
+  } catch (error: any) {
+    console.error('分离插件失败:', error)
+  }
+}
+
 // 监听显示设置页面的变化,调整窗口高度
 watch(currentView, () => {
   if (currentView.value === ViewMode.Plugin) {
@@ -103,6 +115,17 @@ watch(currentView, () => {
 function handleKeydown(event: KeyboardEvent): void {
   // 如果正在输入法组合中,忽略所有键盘事件
   if (isComposing.value) {
+    return
+  }
+
+  // Cmd/Ctrl + D: 分离插件到独立窗口
+  if ((event.key === 'd' || event.key === 'D') && (event.metaKey || event.ctrlKey)) {
+    console.log('检测到 Cmd+D 快捷键，当前视图:', currentView.value)
+    event.preventDefault()
+    if (currentView.value === ViewMode.Plugin && windowStore.currentPlugin) {
+      console.log('正在分离插件...')
+      detachCurrentPlugin()
+    }
     return
   }
 

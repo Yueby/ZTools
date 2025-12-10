@@ -93,6 +93,20 @@ class APIManager {
         return { success: false, error: error.message || '未知错误' }
       }
     })
+
+    // 分离当前插件到独立窗口
+    ipcMain.handle('detach-plugin', async () => {
+      try {
+        if (this.pluginManager) {
+          const result = await this.pluginManager.detachCurrentPlugin()
+          return result
+        }
+        return { success: false, error: '功能不可用' }
+      } catch (error: any) {
+        console.error('分离插件失败:', error)
+        return { success: false, error: error.message || '未知错误' }
+      }
+    })
   }
 
   /**

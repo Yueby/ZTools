@@ -1,4 +1,4 @@
-import { BrowserWindow, BrowserWindowConstructorOptions } from 'electron'
+import { BrowserWindow, BrowserWindowConstructorOptions, WebContentsView } from 'electron'
 import path from 'path'
 import { v4 as uuidv4 } from 'uuid'
 import { session } from 'electron'
@@ -14,8 +14,19 @@ interface PluginWindowInfo {
   pluginName: string
 }
 
+/**
+ * 分离的插件窗口信息
+ */
+interface DetachedWindowInfo {
+  window: BrowserWindow
+  view: WebContentsView
+  pluginPath: string
+  pluginName: string
+}
+
 class PluginWindowManager {
   private windowInfoMap: Map<string, PluginWindowInfo> = new Map()
+  private detachedWindowMap: Map<string, DetachedWindowInfo> = new Map()
   private taskMap: Map<string, Promise<any>> = new Map()
   private taskCounter = 0
 
@@ -329,6 +340,109 @@ class PluginWindowManager {
       }
     }
     this.windowInfoMap.clear()
+
+    // 同时关闭所有分离的窗口
+    for (const detachedInfo of this.detachedWindowMap.values()) {
+      if (!detachedInfo.window.isDestroyed()) {
+        detachedInfo.window.close()
+      }
+    }
+    this.detachedWindowMap.clear()
+  }
+
+  /**
+   * 创建分离的插件窗口
+   * 将现有的 WebContentsView 移动到一个独立的窗口中
+   */
+  public createDetachedWindow(
+    pluginPath: string,
+    pluginName: string,
+    view: WebContentsView,
+    options: { width: number; height: number; title: string }
+  ): BrowserWindow | null {
+    try {
+      const windowId = uuidv4()
+
+      // 创建独立窗口
+      const win = new BrowserWindow({
+        width: options.width,
+        height: options.height,
+        title: options.title,
+        frame: true,
+        resizable: true,
+        webPreferences: {
+          contextIsolation: true,
+          nodeIntegration: false
+        }
+      })
+
+      // 将 view 添加到新窗口
+      win.contentView.addChildView(view)
+
+      // 设置 view 的边界以填充整个窗口
+      const bounds = win.getContentBounds()
+      view.setBounds({ x: 0, y: 0, width: bounds.width, height: bounds.height })
+
+      // 监听窗口大小变化，调整 view 大小
+      win.on('resize', () => {
+        if (!win.isDestroyed()) {
+          const newBounds = win.getContentBounds()
+          view.setBounds({ x: 0, y: 0, width: newBounds.width, height: newBounds.height })
+        }
+      })
+
+      // 保存窗口信息
+      this.detachedWindowMap.set(windowId, {
+        window: win,
+        view,
+        pluginPath,
+        pluginName
+      })
+
+      // 监听窗口关闭
+      win.on('closed', () => {
+        this.detachedWindowMap.delete(windowId)
+        // 销毁 view 的 webContents
+        if (!view.webContents.isDestroyed()) {
+          view.webContents.close()
+        }
+        console.log(`分离窗口已关闭: ${pluginName}`)
+      })
+
+      // 显示窗口
+      win.show()
+
+      // 让 view 获取焦点
+      view.webContents.focus()
+
+      console.log(`创建分离窗口成功: ${pluginName}`)
+      return win
+    } catch (error) {
+      console.error('创建分离窗口失败:', error)
+      return null
+    }
+  }
+
+  /**
+   * 关闭指定插件的所有分离窗口
+   */
+  public closeDetachedByPlugin(pluginPath: string): void {
+    const windowIdsToClose: string[] = []
+
+    for (const [windowId, windowInfo] of this.detachedWindowMap.entries()) {
+      if (windowInfo.pluginPath === pluginPath) {
+        windowIdsToClose.push(windowId)
+      }
+    }
+
+    for (const windowId of windowIdsToClose) {
+      const windowInfo = this.detachedWindowMap.get(windowId)
+      if (windowInfo && !windowInfo.window.isDestroyed()) {
+        windowInfo.window.close()
+      }
+    }
+
+    console.log(`已关闭插件 ${pluginPath} 的 ${windowIdsToClose.length} 个分离窗口`)
   }
 }
 

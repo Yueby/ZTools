@@ -141,10 +141,15 @@ class PluginManager {
         }
       })
 
-      // 监听 ESC 键
+      // 监听 ESC 键和 Cmd+D 快捷键
       this.pluginView.webContents.on('before-input-event', (_event, input) => {
         if (input.type === 'keyDown' && input.key === 'Escape') {
           this.handlePluginEsc()
+        }
+        // Cmd+D / Ctrl+D: 分离插件到独立窗口
+        if (input.type === 'keyDown' && (input.key === 'd' || input.key === 'D') && (input.meta || input.control)) {
+          console.log('插件视图检测到 Cmd+D 快捷键')
+          this.detachCurrentPlugin()
         }
       })
 
@@ -590,6 +595,71 @@ class PluginManager {
     }
 
     return false
+  }
+
+  /**
+   * 分离当前插件到独立窗口
+   * 将当前在主窗口中运行的插件分离到一个独立的窗口中
+   */
+  public async detachCurrentPlugin(): Promise<{ success: boolean; error?: string }> {
+    if (!this.mainWindow || !this.pluginView || !this.currentPluginPath) {
+      return { success: false, error: '没有正在运行的插件' }
+    }
+
+    try {
+      // 获取当前插件信息
+      const cached = this.pluginViews.find((v) => v.path === this.currentPluginPath)
+      if (!cached) {
+        return { success: false, error: '插件信息未找到' }
+      }
+
+      // 读取插件配置
+      const pluginJsonPath = path.join(this.currentPluginPath, 'plugin.json')
+      const pluginConfig = JSON.parse(fsSync.readFileSync(pluginJsonPath, 'utf-8'))
+
+      // 获取当前窗口大小
+      const [windowWidth] = this.mainWindow.getSize()
+      const viewHeight = cached.height || 600 - 59
+
+      // 创建独立窗口
+      const detachedWindow = pluginWindowManager.createDetachedWindow(
+        this.currentPluginPath,
+        pluginConfig.name,
+        cached.view,
+        {
+          width: windowWidth,
+          height: viewHeight + 59, // 加上标题栏高度
+          title: pluginConfig.name
+        }
+      )
+
+      if (!detachedWindow) {
+        return { success: false, error: '创建独立窗口失败' }
+      }
+
+      // 从主窗口中移除插件视图
+      this.mainWindow.contentView.removeChildView(this.pluginView)
+
+      // 从缓存中移除
+      const index = this.pluginViews.findIndex((v) => v.path === this.currentPluginPath)
+      if (index !== -1) {
+        this.pluginViews.splice(index, 1)
+      }
+
+      // 通知渲染进程插件已关闭
+      this.mainWindow.webContents.send('plugin-closed')
+      this.mainWindow.webContents.send('back-to-search')
+
+      // 清空当前引用
+      this.pluginView = null
+      this.currentPluginPath = null
+
+      console.log('插件已分离到独立窗口:', pluginConfig.name)
+      return { success: true }
+    } catch (error: any) {
+      console.error('分离插件失败:', error)
+      return { success: false, error: error.message || '未知错误' }
+    }
   }
 }
 

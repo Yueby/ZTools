@@ -149,6 +149,16 @@ onMounted(() => {
         console.error('终止插件失败:', error)
         alert(`终止插件失败: ${error.message || '未知错误'}`)
       }
+    } else if (command === 'detach-plugin') {
+      try {
+        const result = await window.ztools.detachPlugin()
+        if (!result.success) {
+          alert(`分离插件失败: ${result.error}`)
+        }
+      } catch (error: any) {
+        console.error('分离插件失败:', error)
+        alert(`分离插件失败: ${error.message || '未知错误'}`)
+      }
     }
   })
 })
@@ -163,6 +173,7 @@ async function handleSettingsClick(): Promise<void> {
   if (props.currentView === 'plugin' && windowStore.currentPlugin) {
     console.log('显示插件菜单')
     const menuItems = [
+      { id: 'detach-plugin', label: '分离到独立窗口 (⌘+D)' },
       { id: 'open-devtools', label: '打开开发者工具' },
       { id: 'kill-plugin', label: '结束运行' }
     ]

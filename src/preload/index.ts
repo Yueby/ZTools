@@ -111,6 +111,7 @@ contextBridge.exposeInMainWorld('ztools', {
     ipcRenderer.on('ipc-launch', (_event, options) => callback(options))
   },
   openPluginDevTools: () => ipcRenderer.invoke('open-plugin-devtools'),
+  detachPlugin: () => ipcRenderer.invoke('detach-plugin'),
   // 快捷键相关
   updateShortcut: (shortcut: string) => ipcRenderer.invoke('update-shortcut', shortcut),
   getCurrentShortcut: () => ipcRenderer.invoke('get-current-shortcut'),
@@ -241,6 +242,7 @@ declare global {
       onAppLaunched: (callback: () => void) => void
       onHistoryChanged: (callback: () => void) => void
       openPluginDevTools: () => Promise<{ success: boolean; error?: string }>
+      detachPlugin: () => Promise<{ success: boolean; error?: string }>
       // 快捷键相关
       updateShortcut: (shortcut: string) => Promise<{ success: boolean; error?: string }>
       getCurrentShortcut: () => Promise<string>
