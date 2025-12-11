@@ -86,7 +86,7 @@ export class PluginUIAPI {
       }
 
       return true
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('设置子输入框失败:', error)
       return false
     }
@@ -104,7 +104,7 @@ export class PluginUIAPI {
       this.mainWindow?.webContents.send('set-sub-input-value', text)
       console.log('设置子输入框值:', text)
       return true
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('设置子输入框值失败:', error)
       return false
     }
@@ -120,7 +120,7 @@ export class PluginUIAPI {
       console.log('请求聚焦子输入框')
 
       return true
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('聚焦子输入框失败:', error)
       return false
     }

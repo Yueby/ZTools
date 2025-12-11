@@ -50,7 +50,7 @@ export class PluginsAPI {
             action
           )
           return { success: true, result }
-        } catch (error: any) {
+        } catch (error: unknown) {
           console.error('调用无界面插件失败:', error)
           return { success: false, error: error.message }
         }
@@ -101,7 +101,7 @@ export class PluginsAPI {
 
       const zipPath = result.filePaths[0]
       return await this._installPluginFromZip(zipPath)
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('导入插件失败:', error)
       return { success: false, error: error.message || '未知错误' }
     }
@@ -206,7 +206,7 @@ export class PluginsAPI {
 
       this.mainWindow?.webContents.send('plugins-changed')
       return { success: true, plugin: pluginInfo }
-    } catch (error: any) {
+    } catch (error: unknown) {
       await fs.rm(tempExtractPath, { recursive: true, force: true })
       console.error('安装插件失败:', error)
       return { success: false, error: error.message || '安装失败' }
@@ -294,7 +294,7 @@ export class PluginsAPI {
 
       this.mainWindow?.webContents.send('plugins-changed')
       return { success: true }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('添加开发中插件失败:', error)
       return { success: false, error: error.message || '未知错误' }
     }
@@ -331,7 +331,7 @@ export class PluginsAPI {
       }
 
       return { success: true }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('删除插件失败:', error)
       return { success: false, error: error.message || '未知错误' }
     }
@@ -379,7 +379,7 @@ export class PluginsAPI {
       this.mainWindow?.webContents.send('plugins-changed')
       console.log('插件重载成功:', pluginPath)
       return { success: true }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('重载插件失败:', error)
       return { success: false, error: error.message || '未知错误' }
     }
@@ -406,7 +406,7 @@ export class PluginsAPI {
         }
       }
       return { success: false, error: '功能不可用' }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('终止插件失败:', error)
       return { success: false, error: error.message || '未知错误' }
     }
@@ -427,7 +427,7 @@ export class PluginsAPI {
         }
       }
       return { success: false, error: '功能不可用' }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('终止插件并返回搜索页面失败:', error)
       return { success: false, error: error.message || '未知错误' }
     }
@@ -509,7 +509,7 @@ export class PluginsAPI {
       await databaseAPI.dbPut('plugin-market-data', json)
 
       return { success: true, data: json }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('获取插件市场列表失败:', error)
       try {
         const cachedData = await databaseAPI.dbGet('plugin-market-data')
@@ -578,7 +578,7 @@ export class PluginsAPI {
       }
 
       return result
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('从市场安装插件失败:', error)
       return { success: false, error: error.message || '安装失败' }
     }

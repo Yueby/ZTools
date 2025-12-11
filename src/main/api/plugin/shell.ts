@@ -15,7 +15,7 @@ export class PluginShellAPI {
       try {
         await shell.openExternal(url)
         event.returnValue = { success: true }
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error('打开 URL 失败:', error)
         event.returnValue = { success: false, error: error.message }
       }
@@ -25,7 +25,7 @@ export class PluginShellAPI {
     ipcMain.on('shell-show-item-in-folder', (event, fullPath: string) => {
       try {
         shell.showItemInFolder(fullPath)
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error('在文件管理器中显示文件失败:', error)
       }
       event.returnValue = undefined

@@ -1,8 +1,6 @@
-import type Electron from 'electron'
-
 export class SystemSettingsAPI {
-  public init(_mainWindow: Electron.BrowserWindow): void {
-    // 暂时不需要使用 mainWindow
+  public init(): void {
+    // 暂时不需要初始化逻辑
   }
 
   public async getSystemSettings(): Promise<any[]> {
@@ -12,11 +10,10 @@ export class SystemSettingsAPI {
     }
     return []
   }
-  
+
   public isWindows(): boolean {
     return process.platform === 'win32'
   }
 }
 
 export const systemSettingsAPI = new SystemSettingsAPI()
-

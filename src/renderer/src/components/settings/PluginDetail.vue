@@ -1,101 +1,97 @@
 <template>
-  <!-- 覆盖内容区的详情面板（无遮罩） -->
-  <div class="plugin-detail-panel">
-    <div class="detail-topbar">
-      <button class="icon-btn back-btn" aria-label="返回" title="返回" @click="emit('back')">
-        <Icon name="back" size="18" />
-      </button>
-      <div class="topbar-title">插件详情</div>
-    </div>
-
-    <div class="detail-scrollable">
-      <div class="detail-content">
-        <div class="detail-header">
-          <img v-if="plugin.logo" :src="plugin.logo" class="detail-icon" alt="插件图标" />
-          <div v-else class="detail-icon placeholder">🧩</div>
-          <div class="detail-title">
-            <div class="detail-name">{{ plugin.name }}</div>
-            <div class="detail-version">v{{ plugin.version }}</div>
-          </div>
-          <div class="detail-actions">
-            <template v-if="plugin.installed">
-              <button
-                v-if="canUpgrade"
-                class="btn btn-md btn-warning"
-                :disabled="isLoading"
-                @click="emit('upgrade')"
-              >
-                <span v-if="isLoading" class="loading-spinner"></span>
-                <span v-else>升级到 v{{ plugin.version }}</span>
-              </button>
-              <button v-else class="btn btn-md" @click="emit('open')">打开</button>
-            </template>
-            <button v-else class="btn btn-icon" title="下载" :disabled="isLoading" @click="emit('download')">
+  <DetailPanel title="插件详情" @back="emit('back')">
+    <div class="detail-content">
+      <div class="detail-header">
+        <img v-if="plugin.logo" :src="plugin.logo" class="detail-icon" alt="插件图标" />
+        <div v-else class="detail-icon placeholder">🧩</div>
+        <div class="detail-title">
+          <div class="detail-name">{{ plugin.name }}</div>
+          <div class="detail-version">v{{ plugin.version }}</div>
+        </div>
+        <div class="detail-actions">
+          <template v-if="plugin.installed">
+            <button
+              v-if="canUpgrade"
+              class="btn btn-md btn-warning"
+              :disabled="isLoading"
+              @click="emit('upgrade')"
+            >
               <span v-if="isLoading" class="loading-spinner"></span>
-              <svg
-                v-else
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                />
-                <path
-                  d="M7 10L12 15L17 10"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                />
-                <path
-                  d="M12 15V3"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                />
-              </svg>
+              <span v-else>升级到 v{{ plugin.version }}</span>
             </button>
-          </div>
+            <button v-else class="btn btn-md" @click="emit('open')">打开</button>
+          </template>
+          <button
+            v-else
+            class="btn btn-icon"
+            title="下载"
+            :disabled="isLoading"
+            @click="emit('download')"
+          >
+            <span v-if="isLoading" class="loading-spinner"></span>
+            <svg
+              v-else
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+              <path
+                d="M7 10L12 15L17 10"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+              <path
+                d="M12 15V3"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </button>
         </div>
-      </div>
-
-      <div class="detail-desc">{{ plugin.description || '暂无描述' }}</div>
-
-      <div class="detail-section">
-        <div class="detail-section-title">指令列表</div>
-        <div v-if="plugin.features && plugin.features.length > 0" class="feature-list">
-          <div v-for="feature in plugin.features" :key="feature.code" class="feature-item">
-            <div class="feature-title">{{ feature.explain || feature.code }}</div>
-            <div class="cmd-list">
-              <span
-                v-for="cmd in feature.cmds"
-                :key="cmdKey(cmd)"
-                class="cmd-chip"
-                :class="isMatchCmd(cmd) ? `type-${cmdType(cmd)}` : ''"
-              >
-                <span class="cmd-text">{{ cmdLabel(cmd) }}</span>
-                <span v-if="isMatchCmd(cmd)" class="cmd-badge">{{ cmdTypeBadge(cmd) }}</span>
-              </span>
-            </div>
-          </div>
-        </div>
-        <div v-else class="empty-feature">暂无指令</div>
       </div>
     </div>
-  </div>
+
+    <div class="detail-desc">{{ plugin.description || '暂无描述' }}</div>
+
+    <div class="detail-section">
+      <div class="detail-section-title">指令列表</div>
+      <div v-if="plugin.features && plugin.features.length > 0" class="feature-list">
+        <div v-for="feature in plugin.features" :key="feature.code" class="feature-item">
+          <div class="feature-title">{{ feature.explain || feature.code }}</div>
+          <div class="cmd-list">
+            <span
+              v-for="cmd in feature.cmds"
+              :key="cmdKey(cmd)"
+              class="cmd-chip"
+              :class="isMatchCmd(cmd) ? `type-${cmdType(cmd)}` : ''"
+            >
+              <span class="cmd-text">{{ cmdLabel(cmd) }}</span>
+              <span v-if="isMatchCmd(cmd)" class="cmd-badge">{{ cmdTypeBadge(cmd) }}</span>
+            </span>
+          </div>
+        </div>
+      </div>
+      <div v-else class="empty-feature">暂无指令</div>
+    </div>
+  </DetailPanel>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import Icon from './Icon.vue'
+import DetailPanel from '../common/DetailPanel.vue'
 
 interface PluginFeature {
   code: string
@@ -113,7 +109,7 @@ interface PluginItem {
   localVersion?: string
 }
 
-const props = defineProps<{ 
+const props = defineProps<{
   plugin: PluginItem
   isLoading?: boolean
 }>()
@@ -177,36 +173,6 @@ function cmdTypeBadge(cmd: any): string {
 </script>
 
 <style scoped>
-/* 覆盖内容区的详情面板 */
-.plugin-detail-panel {
-  position: absolute;
-  inset: 0;
-  z-index: 10;
-  display: flex;
-  flex-direction: column;
-  background: var(--card-bg);
-}
-
-.detail-topbar {
-  height: 44px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 10px;
-  border-bottom: 1px solid var(--divider-color);
-}
-
-.topbar-title {
-  font-size: 14px;
-  color: var(--text-secondary);
-}
-
-.detail-scrollable {
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-}
-
 .detail-content {
   padding: 16px;
 }
@@ -310,7 +276,7 @@ function cmdTypeBadge(cmd: any): string {
 .feature-item {
   border-radius: 8px;
   padding: 12px;
-  background: var(--card-bg);
+  background: var(--bg-color);
   transition: all 0.2s;
 }
 
@@ -376,15 +342,5 @@ function cmdTypeBadge(cmd: any): string {
   font-size: 13px;
   color: var(--text-secondary);
   padding: 12px;
-}
-
-/* 图标按钮颜色样式 */
-.back-btn {
-  color: var(--text-color);
-}
-
-.back-btn:hover:not(:disabled) {
-  background: var(--hover-bg);
-  color: var(--primary-color);
 }
 </style>

@@ -87,7 +87,7 @@ export class PluginFeatureAPI {
         this.notifyPluginsChanged()
 
         event.returnValue = { success: true }
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error('set-feature error:', error)
         event.returnValue = { success: false, error: error.message }
       }

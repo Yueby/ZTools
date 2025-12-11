@@ -296,7 +296,7 @@ export class DatabaseAPI {
 
         const result = lmdbInstance.put(doc)
         event.returnValue = result.ok ? undefined : result
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error('dbStorage.setItem 失败:', error)
         event.returnValue = { error: error.message }
       }
@@ -309,7 +309,7 @@ export class DatabaseAPI {
       try {
         const doc = lmdbInstance.get(docId)
         event.returnValue = doc ? doc.data : null
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error('dbStorage.getItem 失败:', error)
         event.returnValue = null
       }
@@ -322,7 +322,7 @@ export class DatabaseAPI {
       try {
         const result = lmdbInstance.remove(docId)
         event.returnValue = result.ok ? undefined : result
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error('dbStorage.removeItem 失败:', error)
         event.returnValue = { error: error.message }
       }
@@ -392,7 +392,7 @@ export class DatabaseAPI {
         })
 
         return { success: true, data }
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error('获取插件数据统计失败:', error)
         return { success: false, error: error.message }
       }
@@ -425,7 +425,7 @@ export class DatabaseAPI {
         }
 
         return { success: true, data: keys }
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error('获取插件文档 keys 失败:', error)
         return { success: false, error: error.message }
       }
@@ -458,7 +458,7 @@ export class DatabaseAPI {
         }
 
         return { success: false, error: '文档不存在' }
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error('获取插件文档失败:', error)
         return { success: false, error: error.message }
       }
@@ -508,7 +508,7 @@ export class DatabaseAPI {
         }
 
         return { success: true, deletedCount }
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error('清空插件数据失败:', error)
         return { success: false, error: error.message }
       }

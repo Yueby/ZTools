@@ -43,7 +43,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
-import { useWindowStore } from '../stores/windowStore'
+import { useWindowStore } from '../../stores/windowStore'
 import UpdateIcon from './UpdateIcon.vue'
 
 const props = defineProps<{

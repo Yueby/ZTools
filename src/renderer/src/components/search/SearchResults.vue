@@ -86,9 +86,9 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
-import { useAppDataStore } from '../stores/appDataStore'
-import { useWindowStore } from '../stores/windowStore'
-import CollapsibleList from './common/CollapsibleList.vue'
+import { useCommandDataStore } from '../../stores/commandDataStore'
+import { useWindowStore } from '../../stores/windowStore'
+import CollapsibleList from '../common/CollapsibleList.vue'
 
 interface Props {
   searchQuery: string
@@ -103,16 +103,16 @@ const emit = defineEmits<{
 }>()
 
 // 使用 store
-const appDataStore = useAppDataStore()
+const appDataStore = useCommandDataStore()
 const {
   loading,
   search,
-  getRecentApps,
+  getRecentCommands,
   removeFromHistory,
-  pinApp,
-  unpinApp,
+  pinCommand,
+  unpinCommand,
   isPinned,
-  getPinnedApps,
+  getPinnedCommands,
   updatePinnedOrder
 } = appDataStore
 
@@ -135,13 +135,17 @@ const internalSearchResults = computed(() => {
 // 分离系统设置结果
 const systemSettingResults = computed(() => {
   if (!props.searchQuery.trim()) return []
-  return internalSearchResults.value.filter((item: any) => item.type === 'direct' && item.subType === 'system-setting')
+  return internalSearchResults.value.filter(
+    (item: any) => item.type === 'direct' && item.subType === 'system-setting'
+  )
 })
 
 // 应用和插件结果（排除系统设置）
 const appAndPluginResults = computed(() => {
   if (!props.searchQuery.trim()) return []
-  return internalSearchResults.value.filter((item: any) => !(item.type === 'direct' && item.subType === 'system-setting'))
+  return internalSearchResults.value.filter(
+    (item: any) => !(item.type === 'direct' && item.subType === 'system-setting')
+  )
 })
 
 // 推荐列表
@@ -190,7 +194,7 @@ const finderActions = computed(() => {
 // 显示的应用列表
 const displayApps = computed(() => {
   if (props.searchQuery.trim() === '') {
-    return getRecentApps()
+    return getRecentCommands()
   } else {
     return internalSearchResults.value
   }
@@ -198,7 +202,7 @@ const displayApps = computed(() => {
 
 // 固定应用列表
 const pinnedApps = computed(() => {
-  return getPinnedApps()
+  return getPinnedCommands()
 })
 
 // 可见的最近使用应用（用于键盘导航）
@@ -231,14 +235,14 @@ function arrayToGrid(arr: any[], cols = 9): any[][] {
 const visibleAppAndPluginResults = computed(() => {
   const defaultVisibleCount = 9 * 2 // itemsPerRow * defaultVisibleRows
   const canExpand = appAndPluginResults.value.length > defaultVisibleCount
-  
+
   let result
   if (!canExpand || isSearchResultsExpanded.value) {
     result = appAndPluginResults.value
   } else {
     result = appAndPluginResults.value.slice(0, defaultVisibleCount)
   }
-  
+
   return result
 })
 
@@ -380,7 +384,13 @@ watch(
 
 // 监听展开状态变化，调整窗口高度
 watch(
-  [isRecentExpanded, isPinnedExpanded, isSearchResultsExpanded, isSystemSettingsExpanded, isRecommendationsExpanded],
+  [
+    isRecentExpanded,
+    isPinnedExpanded,
+    isSearchResultsExpanded,
+    isSystemSettingsExpanded,
+    isRecommendationsExpanded
+  ],
   () => {
     nextTick(() => {
       emit('height-changed')
@@ -424,8 +434,7 @@ function scrollToSelectedItem(): void {
       })
     } else if (isBelow) {
       // 项目在下方，滚动到底部对齐
-      const scrollTop =
-        container.scrollTop + (targetRect.bottom - containerRect.bottom) + 10 // 留一点边距
+      const scrollTop = container.scrollTop + (targetRect.bottom - containerRect.bottom) + 10 // 留一点边距
       container.scrollTo({
         top: scrollTop,
         behavior: 'smooth'
@@ -435,12 +444,9 @@ function scrollToSelectedItem(): void {
 }
 
 // 监听选中项变化，自动滚动
-watch(
-  [selectedRow, selectedCol],
-  () => {
-    scrollToSelectedItem()
-  }
-)
+watch([selectedRow, selectedCol], () => {
+  scrollToSelectedItem()
+})
 
 // 监听固定列表变化，调整窗口高度（特别是从空到非空或从非空到空时）
 watch(
@@ -497,7 +503,12 @@ async function handleAppContextMenu(
   }
 
   // 如果是应用（不是插件和系统设置），显示"打开文件位置"
-  if (app.type !== 'system-setting' && app.type !== 'plugin' && app.path && !app.path.startsWith('baidu-search:')) {
+  if (
+    app.type !== 'system-setting' &&
+    app.type !== 'plugin' &&
+    app.path &&
+    !app.path.startsWith('baidu-search:')
+  ) {
     menuItems.push({
       id: `reveal-in-finder:${JSON.stringify({ path: app.path })}`,
       label: '打开文件位置'
@@ -671,7 +682,7 @@ async function handleContextMenuCommand(command: string): Promise<void> {
     const appJson = command.replace('pin-app:', '')
     try {
       const app = JSON.parse(appJson)
-      await pinApp(app)
+      await pinCommand(app)
       nextTick(() => {
         emit('height-changed')
       })
@@ -682,7 +693,7 @@ async function handleContextMenuCommand(command: string): Promise<void> {
     const jsonStr = command.replace('unpin-app:', '')
     try {
       const { path, featureCode } = JSON.parse(jsonStr)
-      await unpinApp(path, featureCode)
+      await unpinCommand(path, featureCode)
       nextTick(() => {
         emit('height-changed')
       })
@@ -725,38 +736,6 @@ defineExpose({
   max-height: 541px; /* 600 - 59 (搜索框高度) */
   overflow-y: auto;
   overflow-x: hidden;
-}
-
-/* 自定义滚动条 */
-.scrollable-content::-webkit-scrollbar {
-  width: 8px;
-}
-
-.scrollable-content::-webkit-scrollbar-track {
-  background: transparent;
-  margin: 4px 0; /* 上下留出间距 */
-}
-
-.scrollable-content::-webkit-scrollbar-thumb {
-  background: var(--border-color);
-  border-radius: 4px;
-  transition: background 0.2s ease;
-  /* 添加一点内边距效果 */
-  background-clip: padding-box;
-  border: 2px solid transparent;
-}
-
-.scrollable-content::-webkit-scrollbar-thumb:hover {
-  background: var(--text-secondary);
-  background-clip: padding-box;
-  border: 2px solid transparent;
-}
-
-/* 滚动时的样式 */
-.scrollable-content::-webkit-scrollbar-thumb:active {
-  background: var(--text-color);
-  background-clip: padding-box;
-  border: 1px solid transparent;
 }
 
 .content-section {

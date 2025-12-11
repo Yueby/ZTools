@@ -100,15 +100,17 @@
     </div>
 
     <!-- 插件详情覆盖面板组件 -->
-    <PluginDetail
-      v-if="isDetailVisible && selectedPlugin"
-      :plugin="selectedPlugin"
-      :is-loading="installingPlugin === selectedPlugin.name"
-      @back="closePluginDetail"
-      @open="handleOpenPlugin(selectedPlugin)"
-      @download="downloadPlugin(selectedPlugin)"
-      @upgrade="handleUpgradePlugin(selectedPlugin)"
-    />
+    <Transition name="slide">
+      <PluginDetail
+        v-if="isDetailVisible && selectedPlugin"
+        :plugin="selectedPlugin"
+        :is-loading="installingPlugin === selectedPlugin.name"
+        @back="closePluginDetail"
+        @open="handleOpenPlugin(selectedPlugin)"
+        @download="downloadPlugin(selectedPlugin)"
+        @upgrade="handleUpgradePlugin(selectedPlugin)"
+      />
+    </Transition>
   </div>
 </template>
 
@@ -332,25 +334,7 @@ onMounted(() => {
   overflow-y: auto;
   overflow-x: hidden;
   padding: 20px;
-  background: var(--card-bg);
-}
-
-/* 自定义滚动条 */
-.scrollable-content::-webkit-scrollbar {
-  width: 6px;
-}
-
-.scrollable-content::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.scrollable-content::-webkit-scrollbar-thumb {
-  background: var(--border-color);
-  border-radius: 3px;
-}
-
-.scrollable-content::-webkit-scrollbar-thumb:hover {
-  background: var(--text-secondary);
+  background: var(--bg-color);
 }
 
 .market-grid {

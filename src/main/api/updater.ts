@@ -194,7 +194,7 @@ export class UpdaterAPI {
       }
 
       return { success: true, extractPath }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('下载更新失败:', error)
       return { success: false, error: error.message }
     }
@@ -285,7 +285,7 @@ export class UpdaterAPI {
       await this.launchUpdater(paths)
 
       return { success: true }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('安装更新失败:', error)
       return { success: false, error: error.message }
     }
@@ -379,7 +379,7 @@ export class UpdaterAPI {
           console.error(e)
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('检查更新失败:', error)
       return { success: false, error: error.message || '检查更新失败' }
     }
@@ -405,7 +405,7 @@ export class UpdaterAPI {
       await this.launchUpdater(paths)
 
       return { success: true }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('更新流程失败:', error)
       return { success: false, error: error.message }
     }

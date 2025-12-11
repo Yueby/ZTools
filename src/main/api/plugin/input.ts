@@ -51,7 +51,7 @@ export class PluginInputAPI {
         }
       }
       return { success: false, error: '功能不可用' }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('发送输入事件失败:', error)
       return { success: false, error: error.message || '未知错误' }
     }

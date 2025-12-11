@@ -16,7 +16,12 @@
           </div>
 
           <div class="shortcut-meta">
-            <button class="icon-btn edit-btn" title="编辑" :disabled="isDeleting" @click="handleEdit(shortcut)">
+            <button
+              class="icon-btn edit-btn"
+              title="编辑"
+              :disabled="isDeleting"
+              @click="handleEdit(shortcut)"
+            >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="14"
@@ -32,7 +37,12 @@
                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
               </svg>
             </button>
-            <button class="icon-btn delete-btn" title="删除" :disabled="isDeleting" @click="handleDelete(shortcut.id)">
+            <button
+              class="icon-btn delete-btn"
+              title="删除"
+              :disabled="isDeleting"
+              @click="handleDelete(shortcut.id)"
+            >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="14"
@@ -65,12 +75,14 @@
     </div>
 
     <!-- 快捷键编辑器覆盖面板组件 -->
-    <ShortcutEditor
-      v-if="showEditor"
-      :editing-shortcut="editingShortcut"
-      @back="closeEditor"
-      @save="handleSave"
-    />
+    <Transition name="slide">
+      <ShortcutEditor
+        v-if="showEditor"
+        :editing-shortcut="editingShortcut"
+        @back="closeEditor"
+        @save="handleSave"
+      />
+    </Transition>
   </div>
 </template>
 
@@ -158,10 +170,7 @@ async function handleSave(recordedShortcut: string, targetCommand: string): Prom
       }
 
       // 注册新快捷键
-      const result = await window.ztools.registerGlobalShortcut(
-        recordedShortcut,
-        targetCommand
-      )
+      const result = await window.ztools.registerGlobalShortcut(recordedShortcut, targetCommand)
 
       if (result.success) {
         // 更新列表
@@ -215,10 +224,7 @@ async function handleSave(recordedShortcut: string, targetCommand: string): Prom
 
   // 注册全局快捷键
   try {
-    const result = await window.ztools.registerGlobalShortcut(
-      recordedShortcut,
-      targetCommand
-    )
+    const result = await window.ztools.registerGlobalShortcut(recordedShortcut, targetCommand)
     if (result.success) {
       alert('快捷键添加成功!')
       closeEditor()
@@ -275,7 +281,7 @@ onMounted(() => {
 .content-panel {
   position: relative;
   height: 100%;
-  background: var(--card-bg);
+  background: var(--bg-color);
 }
 
 .scrollable-content {
@@ -283,24 +289,6 @@ onMounted(() => {
   overflow-y: auto;
   overflow-x: hidden;
   padding: 20px;
-}
-
-/* 自定义滚动条 */
-.scrollable-content::-webkit-scrollbar {
-  width: 6px;
-}
-
-.scrollable-content::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.scrollable-content::-webkit-scrollbar-thumb {
-  background: var(--border-color);
-  border-radius: 3px;
-}
-
-.scrollable-content::-webkit-scrollbar-thumb:hover {
-  background: var(--text-secondary);
 }
 
 /* 顶部按钮 */

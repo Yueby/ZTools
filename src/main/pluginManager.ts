@@ -147,7 +147,11 @@ class PluginManager {
           this.handlePluginEsc()
         }
         // Cmd+D / Ctrl+D: 分离插件到独立窗口
-        if (input.type === 'keyDown' && (input.key === 'd' || input.key === 'D') && (input.meta || input.control)) {
+        if (
+          input.type === 'keyDown' &&
+          (input.key === 'd' || input.key === 'D') &&
+          (input.meta || input.control)
+        ) {
           console.log('插件视图检测到 Cmd+D 快捷键')
           this.detachCurrentPlugin()
         }
@@ -676,7 +680,7 @@ class PluginManager {
 
       console.log('插件已分离到独立窗口:', pluginConfig.name)
       return { success: true }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('分离插件失败:', error)
       return { success: false, error: error.message || '未知错误' }
     }

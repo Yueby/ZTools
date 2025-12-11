@@ -131,7 +131,7 @@ export class SystemAPI {
       } else {
         return { success: false, error: '激活应用失败' }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('激活应用失败:', error)
       return { success: false, error: error.message || '未知错误' }
     }
@@ -155,7 +155,7 @@ export class SystemAPI {
       // Electron 的 shell.showItemInFolder() 是跨平台的
       // 在 macOS 上会自动使用 Finder，Windows 上使用资源管理器，Linux 上使用文件管理器
       shell.showItemInFolder(filePath)
-    } catch (error: any) {
+    } catch (error: unknown) {
       const platformName =
         process.platform === 'darwin' ? 'macOS' : process.platform === 'win32' ? 'Windows' : 'Linux'
       console.error(`在${platformName}文件管理器中显示文件失败:`, error)
@@ -198,7 +198,7 @@ export class SystemAPI {
       await fs.copyFile(originalPath, avatarPath)
 
       return { success: true, path: `file:///${avatarPath}` }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('选择头像失败:', error)
       return { success: false, error: error.message || '未知错误' }
     }

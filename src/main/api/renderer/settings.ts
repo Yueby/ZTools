@@ -142,7 +142,7 @@ export class SettingsAPI {
       } else {
         return { success: false, error: '快捷键已被占用' }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('更新快捷键失败:', error)
       return { success: false, error: error.message || '未知错误' }
     }
@@ -167,7 +167,7 @@ export class SettingsAPI {
 
       console.log(`成功注册全局快捷键: ${shortcut} -> ${target}`)
       return { success: true }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('注册全局快捷键失败:', error)
       return { success: false, error: error.message || '未知错误' }
     }
@@ -179,7 +179,7 @@ export class SettingsAPI {
       globalShortcut.unregister(shortcut)
       console.log(`成功注销全局快捷键: ${shortcut}`)
       return { success: true }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('注销全局快捷键失败:', error)
       return { success: false, error: error.message || '未知错误' }
     }

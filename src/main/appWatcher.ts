@@ -1,7 +1,23 @@
 import chokidar, { FSWatcher } from 'chokidar'
-import path from 'path'
 import { BrowserWindow } from 'electron'
-import appsAPI from './api/renderer/apps'
+import fs from 'fs'
+import path from 'path'
+import appsAPI from './api/renderer/commands'
+import { getMacApplicationPaths, getWindowsStartMenuPaths } from './utils/systemPaths'
+
+// 要跳过的文件夹名称
+const SKIP_FOLDERS = [
+  'sdk',
+  'doc',
+  'docs',
+  'samples',
+  'sample',
+  'examples',
+  'example',
+  'demos',
+  'demo',
+  'documentation'
+]
 
 class AppWatcher {
   private watcher: FSWatcher | null = null
@@ -15,26 +31,67 @@ class AppWatcher {
     this.startWatching()
   }
 
+  // 获取监听路径
+  private getWatchPaths(): string[] {
+    if (process.platform === 'win32') {
+      return getWindowsStartMenuPaths()
+    }
+
+    if (process.platform === 'darwin') {
+      return getMacApplicationPaths()
+    }
+
+    return []
+  }
+
+  // 判断是否应该忽略
+  private shouldIgnore(filePath: string, watchPaths: string[]): boolean {
+    const basename = path.basename(filePath)
+
+    // 如果是根目录,不忽略
+    if (watchPaths.includes(filePath)) {
+      return false
+    }
+
+    if (process.platform === 'win32') {
+      // Windows: 跳过文档、示例等文件夹
+      const pathParts = filePath.split(path.sep)
+      for (const part of pathParts) {
+        if (SKIP_FOLDERS.includes(part.toLowerCase())) {
+          return true
+        }
+      }
+      // 只监听 .lnk 文件和目录
+      try {
+        const stats = fs.statSync(filePath)
+        return !stats.isDirectory() && !filePath.endsWith('.lnk')
+      } catch {
+        return false
+      }
+    }
+
+    if (process.platform === 'darwin') {
+      // macOS: 只监听 .app 结尾的目录
+      return !basename.endsWith('.app')
+    }
+
+    return true
+  }
+
   // 启动监听
   private startWatching(): void {
-    // 要监听的目录
-    const watchPaths = ['/Applications', '/System/Applications', `${process.env.HOME}/Applications`]
+    // 根据平台设置监听目录
+    const watchPaths = this.getWatchPaths()
 
     console.log('开始监听应用目录变化:', watchPaths)
 
-    // 创建监听器,只监听 .app 目录
+    // 创建监听器
     this.watcher = chokidar.watch(watchPaths, {
-      // 只监听目录的一级深度
-      depth: 1,
-      // 忽略非 .app 目录
+      // Windows 需要递归监听子目录，macOS 只需要一级
+      depth: process.platform === 'win32' ? 5 : 1,
+      // 根据平台设置忽略规则
       ignored: (filePath: string) => {
-        const basename = path.basename(filePath)
-        // 如果是根目录,不忽略
-        if (watchPaths.includes(filePath)) {
-          return false
-        }
-        // 只监听 .app 结尾的目录
-        return !basename.endsWith('.app')
+        return this.shouldIgnore(filePath, watchPaths)
       },
       // 持久化监听
       persistent: true,
@@ -52,20 +109,46 @@ class AppWatcher {
     })
 
     // 监听添加事件
-    this.watcher.on('addDir', (filePath: string) => {
-      if (filePath.endsWith('.app')) {
-        console.log('检测到新应用:', filePath)
-        this.notifyChange('add', filePath)
-      }
-    })
+    if (process.platform === 'win32') {
+      // Windows: 监听 .lnk 文件
+      this.watcher.on('add', (filePath: string) => {
+        if (filePath.endsWith('.lnk')) {
+          console.log('检测到新快捷方式:', filePath)
+          this.notifyChange('add', filePath)
+        }
+      })
+    }
+
+    if (process.platform === 'darwin') {
+      // macOS: 监听 .app 目录
+      this.watcher.on('addDir', (filePath: string) => {
+        if (filePath.endsWith('.app')) {
+          console.log('检测到新应用:', filePath)
+          this.notifyChange('add', filePath)
+        }
+      })
+    }
 
     // 监听删除事件
-    this.watcher.on('unlinkDir', (filePath: string) => {
-      if (filePath.endsWith('.app')) {
-        console.log('检测到应用删除:', filePath)
-        this.notifyChange('remove', filePath)
-      }
-    })
+    if (process.platform === 'win32') {
+      // Windows: 监听 .lnk 文件删除
+      this.watcher.on('unlink', (filePath: string) => {
+        if (filePath.endsWith('.lnk')) {
+          console.log('检测到快捷方式删除:', filePath)
+          this.notifyChange('remove', filePath)
+        }
+      })
+    }
+
+    if (process.platform === 'darwin') {
+      // macOS: 监听 .app 目录删除
+      this.watcher.on('unlinkDir', (filePath: string) => {
+        if (filePath.endsWith('.app')) {
+          console.log('检测到应用删除:', filePath)
+          this.notifyChange('remove', filePath)
+        }
+      })
+    }
 
     // 监听错误
     this.watcher.on('error', (error: unknown) => {

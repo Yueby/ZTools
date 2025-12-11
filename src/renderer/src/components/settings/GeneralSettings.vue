@@ -10,9 +10,26 @@
         <div class="hotkey-input" :class="{ recording: isRecording }" @click="startRecording">
           {{ displayHotkey }}
         </div>
-        <button v-if="hotkey !== defaultHotkey" class="btn btn-icon" title="重置" @click="resetHotkey">
-          <svg width="20" height="20" viewBox="1 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M14.5 9C14.5 11.4853 12.4853 13.5 10 13.5C7.51472 13.5 5.5 11.4853 5.5 9C5.5 6.51472 7.51472 4.5 10 4.5C11.6569 4.5 13.0943 5.41421 13.8536 6.75M14 4V7H11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <button
+          v-if="hotkey !== defaultHotkey"
+          class="btn btn-icon"
+          title="重置"
+          @click="resetHotkey"
+        >
+          <svg
+            width="20"
+            height="20"
+            viewBox="1 0 18 18"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M14.5 9C14.5 11.4853 12.4853 13.5 10 13.5C7.51472 13.5 5.5 11.4853 5.5 9C5.5 6.51472 7.51472 4.5 10 4.5C11.6569 4.5 13.0943 5.41421 13.8536 6.75M14 4V7H11"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
           </svg>
         </button>
       </div>
@@ -131,8 +148,20 @@
           title="重置"
           @click="handleResetAvatar"
         >
-          <svg width="20" height="20" viewBox="1 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M14.5 9C14.5 11.4853 12.4853 13.5 10 13.5C7.51472 13.5 5.5 11.4853 5.5 9C5.5 6.51472 7.51472 4.5 10 4.5C11.6569 4.5 13.0943 5.41421 13.8536 6.75M14 4V7H11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <svg
+            width="20"
+            height="20"
+            viewBox="1 0 18 18"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M14.5 9C14.5 11.4853 12.4853 13.5 10 13.5C7.51472 13.5 5.5 11.4853 5.5 9C5.5 6.51472 7.51472 4.5 10 4.5C11.6569 4.5 13.0943 5.41421 13.8536 6.75M14 4V7H11"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
           </svg>
         </button>
       </div>
@@ -145,11 +174,7 @@
         <span class="setting-desc">复制文本后在设定时间内打开窗口自动粘贴</span>
       </div>
       <div class="setting-control">
-        <select
-          v-model="windowStore.autoPaste"
-          class="select"
-          @change="handleAutoPasteChange"
-        >
+        <select v-model="windowStore.autoPaste" class="select" @change="handleAutoPasteChange">
           <option value="off">关闭</option>
           <option value="1s">1秒内</option>
           <option value="3s">3秒内</option>
@@ -227,7 +252,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { useWindowStore } from '../stores/windowStore'
+import { useWindowStore } from '../../stores/windowStore'
 
 const windowStore = useWindowStore()
 
@@ -266,7 +291,7 @@ const themeColors = [
 const customColor = ref('#db2777')
 
 // 头像默认值（用于重置）
-const defaultAvatar = new URL('../asserts/image/default.png', import.meta.url).href
+const defaultAvatar = new URL('../../assets/image/default.png', import.meta.url).href
 
 // 显示的快捷键文本
 const displayHotkey = computed(() => {
@@ -509,7 +534,7 @@ async function handleCustomColorChange(event: Event): Promise<void> {
   const target = event.target as HTMLInputElement
   const color = target.value
   customColor.value = color
-  
+
   try {
     windowStore.updateCustomColor(color)
     await saveSettings()
@@ -608,7 +633,7 @@ async function loadSettings(): Promise<void> {
       if (data.avatar) {
         windowStore.updateAvatar(data.avatar)
       }
-      
+
       // 加载自定义颜色
       if (data.customColor) {
         customColor.value = data.customColor
@@ -632,11 +657,14 @@ async function loadSettings(): Promise<void> {
 // 保存设置
 async function saveSettings(): Promise<void> {
   try {
+    // 只有自定义头像才保存到数据库，默认头像不保存
+    const avatarToSave = windowStore.avatar === defaultAvatar ? undefined : windowStore.avatar
+
     await window.ztools.dbPut('settings-general', {
       opacity: opacity.value,
       hotkey: hotkey.value,
       placeholder: windowStore.placeholder,
-      avatar: windowStore.avatar,
+      avatar: avatarToSave,
       autoPaste: windowStore.autoPaste,
       hideOnBlur: windowStore.hideOnBlur,
       theme: windowStore.theme,
@@ -662,25 +690,7 @@ onMounted(() => {
   overflow-y: auto;
   overflow-x: hidden;
   padding: 20px;
-  background: var(--card-bg);
-}
-
-/* 自定义滚动条 */
-.content-panel::-webkit-scrollbar {
-  width: 6px;
-}
-
-.content-panel::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.content-panel::-webkit-scrollbar-thumb {
-  background: var(--border-color);
-  border-radius: 3px;
-}
-
-.content-panel::-webkit-scrollbar-thumb:hover {
-  background: var(--text-secondary);
+  background: var(--bg-color);
 }
 
 /* 设置项 */
@@ -887,7 +897,9 @@ onMounted(() => {
   transition: all 0.2s;
   position: relative;
   border: 2px solid transparent;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.15);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.1),
+    0 1px 3px rgba(0, 0, 0, 0.15);
 }
 
 .color-option:hover {

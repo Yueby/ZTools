@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import defaultAvattar from '../asserts/image/default.png'
+import defaultAvatar from '../assets/image/default.png'
 
 interface WindowInfo {
   appName: string
@@ -16,7 +16,7 @@ interface PluginInfo {
 }
 
 const DEFAULT_PLACEHOLDER = '搜索应用或输入命令'
-const DEFAULT_AVATAR = defaultAvattar
+const DEFAULT_AVATAR = defaultAvatar
 
 // 自动粘贴选项
 export type AutoPasteOption = 'off' | '1s' | '3s' | '5s' | '10s'
@@ -124,7 +124,7 @@ export const useWindowStore = defineStore('window', () => {
     // 应用主题色类名到 body
     document.body.className = document.body.className.replace(/theme-\w+/g, '').trim()
     document.body.classList.add(`theme-${value}`)
-    
+
     // 如果是自定义颜色，应用自定义颜色值
     if (value === 'custom') {
       applyCustomColor(customColor.value)
@@ -142,12 +142,12 @@ export const useWindowStore = defineStore('window', () => {
   function applyCustomColor(color: string): void {
     // 智能调整颜色
     const adjustedColor = adjustColorForTheme(color)
-    
+
     // 如果颜色被调整了，输出日志
     if (adjustedColor !== color) {
       console.log('颜色已智能调整:', color, '→', adjustedColor)
     }
-    
+
     // 动态设置 CSS 变量
     document.documentElement.style.setProperty('--primary-color', adjustedColor)
   }
@@ -208,11 +208,7 @@ export const useWindowStore = defineStore('window', () => {
   }
 
   // RGB 转 HSL
-  function rgbToHsl(
-    r: number,
-    g: number,
-    b: number
-  ): { h: number; s: number; l: number } {
+  function rgbToHsl(r: number, g: number, b: number): { h: number; s: number; l: number } {
     r /= 255
     g /= 255
     b /= 255
@@ -324,6 +320,7 @@ export const useWindowStore = defineStore('window', () => {
         if (data.placeholder) {
           placeholder.value = data.placeholder
         }
+        // 只有自定义头像才从数据库加载，没有则使用打包的默认头像
         if (data.avatar) {
           avatar.value = data.avatar
         }

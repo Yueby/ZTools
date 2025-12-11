@@ -39,11 +39,11 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import Icon from '../common/Icon.vue'
 import AllCommands from './AllCommands.vue'
 import DataManagement from './DataManagement.vue'
 import GeneralSettings from './GeneralSettings.vue'
 import GlobalShortcuts from './GlobalShortcuts.vue'
-import Icon from './Icon.vue'
 import PluginCenter from './PluginCenter.vue'
 import PluginMarket from './PluginMarket.vue'
 
@@ -72,6 +72,7 @@ const activeMenu = ref('general')
   display: flex;
   height: 500px; /* 固定高度 */
   background: var(--bg-color);
+  border-top: 1px solid var(--divider-color);
 }
 
 /* 左侧菜单 */

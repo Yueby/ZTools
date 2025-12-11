@@ -1,14 +1,6 @@
 <template>
-  <!-- 覆盖内容区的编辑面板（无遮罩） -->
-  <div class="shortcut-editor-panel">
-    <div class="editor-topbar">
-      <button class="icon-btn back-btn" aria-label="返回" title="返回" @click="emit('back')">
-        <Icon name="back" size="18" />
-      </button>
-      <div class="topbar-title">{{ editingShortcut ? '编辑全局快捷键' : '添加全局快捷键' }}</div>
-    </div>
-
-    <div class="editor-scrollable">
+  <DetailPanel :title="editingShortcut ? '编辑全局快捷键' : '添加全局快捷键'" @back="emit('back')">
+    <div class="editor-wrapper">
       <div class="editor-content">
         <!-- 快捷键录制 -->
         <div class="form-item">
@@ -43,12 +35,12 @@
         </button>
       </div>
     </div>
-  </div>
+  </DetailPanel>
 </template>
 
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from 'vue'
-import Icon from './Icon.vue'
+import DetailPanel from '../common/DetailPanel.vue'
 
 interface GlobalShortcut {
   id: string
@@ -185,33 +177,8 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-/* 覆盖内容区的编辑面板 */
-.shortcut-editor-panel {
-  position: absolute;
-  inset: 0;
-  z-index: 10;
-  display: flex;
-  flex-direction: column;
-}
-
-.editor-topbar {
-  height: 44px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 10px;
-  border-bottom: 1px solid var(--divider-color);
-}
-
-.topbar-title {
-  font-size: 14px;
-  color: var(--text-secondary);
-}
-
-.editor-scrollable {
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
+.editor-wrapper {
+  height: 100%;
   display: flex;
   flex-direction: column;
 }
@@ -273,16 +240,6 @@ onUnmounted(() => {
   gap: 12px;
   padding: 16px 24px;
   border-top: 1px solid var(--divider-color);
-  background: var(--card-bg);
-}
-
-/* 图标按钮颜色样式 */
-.back-btn {
-  color: var(--text-color);
-}
-
-.back-btn:hover:not(:disabled) {
-  background: var(--hover-bg);
-  color: var(--primary-color);
+  background: var(--bg-color);
 }
 </style>

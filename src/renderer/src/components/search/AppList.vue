@@ -16,7 +16,7 @@
           :ref="(el) => setItemRef(el, index)"
           class="app-item"
           :class="{ selected: index === selectedIndex }"
-          style="cursor: move;"
+          style="cursor: move"
           @click="$emit('select', app)"
           @contextmenu.prevent="$emit('contextmenu', app)"
         >
@@ -35,6 +35,7 @@
           <div v-else class="app-icon-placeholder">
             {{ app.name.charAt(0).toUpperCase() }}
           </div>
+          <!-- eslint-disable-next-line vue/no-v-html -->
           <span class="app-name" v-html="getHighlightedName(app)"></span>
         </div>
       </template>
@@ -66,6 +67,7 @@
         <div v-else class="app-icon-placeholder">
           {{ app.name.charAt(0).toUpperCase() }}
         </div>
+        <!-- eslint-disable-next-line vue/no-v-html -->
         <span class="app-name" v-html="getHighlightedName(app)"></span>
       </div>
     </div>
@@ -76,16 +78,16 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, watch, type ComponentPublicInstance } from 'vue';
-import Draggable from 'vuedraggable';
-import type { Command } from '../stores/appDataStore';
-import { highlightMatch } from '../utils/highlight';
+import { computed, nextTick, ref, watch, type ComponentPublicInstance } from 'vue'
+import Draggable from 'vuedraggable'
+import type { Command } from '../../stores/commandDataStore'
+import { highlightMatch } from '../../utils/highlight'
 
 const props = withDefaults(
-defineProps<{
-  apps: Command[]
-  selectedIndex: number
-  emptyText?: string
+  defineProps<{
+    apps: Command[]
+    selectedIndex: number
+    emptyText?: string
     draggable?: boolean
   }>(),
   {
@@ -144,7 +146,10 @@ function scrollToIndex(index: number): void {
   } else if (isBelow) {
     // 项目在下方，滚动到底部对齐
     container.scrollTop =
-      targetElement.offsetTop - container.offsetTop - container.clientHeight + targetElement.offsetHeight
+      targetElement.offsetTop -
+      container.offsetTop -
+      container.clientHeight +
+      targetElement.offsetHeight
   }
 }
 
@@ -309,36 +314,6 @@ defineExpose({
   text-align: center;
   color: var(--text-secondary);
   font-size: 14px;
-}
-
-/* 自定义滚动条 */
-.app-list::-webkit-scrollbar {
-  width: 8px;
-}
-
-.app-list::-webkit-scrollbar-track {
-  background: transparent;
-  margin: 4px 0;
-}
-
-.app-list::-webkit-scrollbar-thumb {
-  background: var(--border-color);
-  border-radius: 4px;
-  transition: background 0.2s ease;
-  background-clip: padding-box;
-  border: 2px solid transparent;
-}
-
-.app-list::-webkit-scrollbar-thumb:hover {
-  background: var(--text-secondary);
-  background-clip: padding-box;
-  border: 2px solid transparent;
-}
-
-.app-list::-webkit-scrollbar-thumb:active {
-  background: var(--text-color);
-  background-clip: padding-box;
-  border: 1px solid transparent;
 }
 
 /* 高亮样式 */
