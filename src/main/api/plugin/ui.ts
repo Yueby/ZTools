@@ -19,6 +19,13 @@ export class PluginUIAPI {
 
     // 设置插件高度
     ipcMain.handle('set-expend-height', (_event, height: number) => this.setExpendHeight(height))
+    
+    // resizeWindow 作为 setExpendHeight 的别名（兼容 uTools API）
+    ipcMain.handle('resize-window', (_event, width: number, height: number) => {
+      // uTools的resizeWindow接受宽度和高度，但ZTools目前只支持调整高度
+      // 忽略width参数，只使用height
+      return this.setExpendHeight(height)
+    })
 
     // 子输入框相关
     ipcMain.handle('set-sub-input', (_event, placeholder?: string, isFocus?: boolean) =>
