@@ -1,70 +1,75 @@
 <template>
   <div class="data-management">
     <!-- 主内容：插件列表 -->
-    <div v-if="!showDocListModal && !showDocDetailModal" class="main-content">
-      <div v-if="isLoaded && pluginDataList.length === 0" class="empty">
-        <p>暂无插件数据</p>
-      </div>
+    <Transition name="list-slide">
+      <div v-show="currentLevel === 'main'" class="main-content">
+        <div v-if="isLoaded && pluginDataList.length === 0" class="empty">
+          <p>暂无插件数据</p>
+        </div>
 
-      <div v-else-if="isLoaded && pluginDataList.length > 0" class="plugin-list">
-        <div
-          v-for="pluginData in pluginDataList"
-          :key="pluginData.pluginName"
-          class="card plugin-card"
-        >
-          <img v-if="pluginData.logo" :src="pluginData.logo" class="plugin-icon" alt="插件图标" />
-          <div v-else class="plugin-icon-placeholder">
-            <Icon name="plugin" :size="24" />
-          </div>
+        <div v-else-if="isLoaded && pluginDataList.length > 0" class="plugin-list">
+          <div
+            v-for="pluginData in pluginDataList"
+            :key="pluginData.pluginName"
+            class="card plugin-card"
+          >
+            <img v-if="pluginData.logo" :src="pluginData.logo" class="plugin-icon" alt="插件图标" />
+            <div v-else class="plugin-icon-placeholder">
+              <Icon name="plugin" :size="24" />
+            </div>
 
-          <div class="plugin-info">
-            <h3 class="plugin-name">{{ pluginData.pluginName }}</h3>
-            <span class="doc-count"
-              >{{ pluginData.docCount }} 个文档 / {{ pluginData.attachmentCount }} 个附件</span
+            <div class="plugin-info">
+              <h3 class="plugin-name">{{ pluginData.pluginName }}</h3>
+              <span class="doc-count"
+                >{{ pluginData.docCount }} 个文档 / {{ pluginData.attachmentCount }} 个附件</span
+              >
+            </div>
+
+            <button
+              class="icon-btn"
+              title="查看文档"
+              @click="viewPluginDocs(pluginData.pluginName)"
             >
+              <Icon name="search" :size="14" />
+            </button>
           </div>
-
-          <button class="icon-btn" title="查看文档" @click="viewPluginDocs(pluginData.pluginName)">
-            <Icon name="search" :size="14" />
-          </button>
         </div>
       </div>
-    </div>
+    </Transition>
 
     <!-- 二级页面：文档列表 -->
-    <Transition name="slide">
-      <DetailPanel
-        v-if="showDocListModal && !showDocDetailModal"
-        :title="`${currentPluginName} - 文档列表`"
-        @back="closeDocListModal"
-      >
-        <div class="detail-header-actions">
-          <button class="btn btn-danger" @click="handleClearData">
-            <Icon name="trash" :size="16" />
-            <span>清空所有数据</span>
-          </button>
+    <DetailPanel
+      v-show="currentLevel === 'docList'"
+      :title="`${currentPluginName} - 文档列表`"
+      :class="docListAnimationClass"
+      @back="closeDocListModal"
+    >
+      <div class="detail-header-actions">
+        <button class="btn btn-danger" @click="handleClearData">
+          <Icon name="trash" :size="16" />
+          <span>清空所有数据</span>
+        </button>
+      </div>
+      <div v-if="docKeys.length === 0" class="empty">暂无文档</div>
+      <div v-else class="doc-list">
+        <div
+          v-for="docItem in docKeys"
+          :key="docItem.key"
+          class="card doc-card"
+          :class="{ active: selectedDocKey === docItem.key }"
+          @click="viewDocContent(docItem.key)"
+        >
+          <span class="doc-key">{{ docItem.key }}</span>
+          <span class="doc-type-badge" :class="`type-${docItem.type}`">
+            {{ docItem.type === 'document' ? '文档' : '附件' }}
+          </span>
         </div>
-        <div v-if="docKeys.length === 0" class="empty">暂无文档</div>
-        <div v-else class="doc-list">
-          <div
-            v-for="docItem in docKeys"
-            :key="docItem.key"
-            class="card doc-card"
-            :class="{ active: selectedDocKey === docItem.key }"
-            @click="viewDocContent(docItem.key)"
-          >
-            <span class="doc-key">{{ docItem.key }}</span>
-            <span class="doc-type-badge" :class="`type-${docItem.type}`">
-              {{ docItem.type === 'document' ? '文档' : '附件' }}
-            </span>
-          </div>
-        </div>
-      </DetailPanel>
-    </Transition>
+      </div>
+    </DetailPanel>
 
     <!-- 三级页面：文档详情 -->
     <Transition name="slide">
-      <DetailPanel v-if="showDocDetailModal" title="文档详情" @back="closeDocDetailModal">
+      <DetailPanel v-if="currentLevel === 'docDetail'" title="文档详情" @back="closeDocDetailModal">
         <div class="doc-detail-content">
           <div class="doc-key-display">
             <span class="label">Key:</span>
@@ -102,15 +107,23 @@ interface DocItem {
   type: 'document' | 'attachment'
 }
 
+// 页面层级类型
+type PageLevel = 'main' | 'docList' | 'docDetail'
+
 const pluginDataList = ref<PluginData[]>([])
 const isLoaded = ref(false)
-const showDocListModal = ref(false)
-const showDocDetailModal = ref(false)
+const currentLevel = ref<PageLevel>('main') // 当前页面层级
 const currentPluginName = ref('')
 const docKeys = ref<DocItem[]>([])
 const selectedDocKey = ref('')
 const currentDocContent = ref<any>(null)
 const currentDocType = ref<'document' | 'attachment'>('document')
+const docListAnimation = ref('slide') // 二级页面的动画名称，完全手动控制
+
+// 二级页面的动画类
+const docListAnimationClass = computed(() => {
+  return `detail-animate-${docListAnimation.value}`
+})
 
 // 格式化文档内容
 const formattedDocContent = computed(() => {
@@ -135,7 +148,8 @@ async function loadPluginData(): Promise<void> {
 // 查看插件文档
 async function viewPluginDocs(pluginName: string): Promise<void> {
   currentPluginName.value = pluginName
-  showDocListModal.value = true
+  docListAnimation.value = 'slide' // 从一级进入二级，用 slide（从右进入）
+  currentLevel.value = 'docList'
 
   try {
     const result = await window.ztools.getPluginDocKeys(pluginName)
@@ -150,7 +164,8 @@ async function viewPluginDocs(pluginName: string): Promise<void> {
 // 查看文档内容
 async function viewDocContent(key: string): Promise<void> {
   selectedDocKey.value = key
-  showDocDetailModal.value = true
+  docListAnimation.value = 'slide-reverse' // 进入三级，二级要向左离开
+  currentLevel.value = 'docDetail'
 
   try {
     const result = await window.ztools.getPluginDoc(currentPluginName.value, key)
@@ -165,7 +180,8 @@ async function viewDocContent(key: string): Promise<void> {
 
 // 关闭文档列表弹窗
 function closeDocListModal(): void {
-  showDocListModal.value = false
+  docListAnimation.value = 'slide' // 返回一级，用 slide（向右离开）
+  currentLevel.value = 'main'
   currentPluginName.value = ''
   docKeys.value = []
   selectedDocKey.value = ''
@@ -173,7 +189,8 @@ function closeDocListModal(): void {
 
 // 关闭文档详情弹窗
 function closeDocDetailModal(): void {
-  showDocDetailModal.value = false
+  docListAnimation.value = 'slide-reverse' // 从三级返回二级，二级从左进入
+  currentLevel.value = 'docList'
   selectedDocKey.value = ''
   currentDocContent.value = null
 }
@@ -215,30 +232,85 @@ onMounted(() => {
 
 <style scoped>
 .data-management {
-  position: relative;
+  position: relative; /* 使详情面板能够覆盖该区域 */
   height: 100%;
-  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* 防止滑动时出现滚动条 */
   background: var(--bg-color);
 }
 
+/* 主内容区 */
 .main-content {
-  height: 100%;
-  padding: 20px;
+  position: absolute;
+  inset: 0;
   overflow-y: auto;
   overflow-x: hidden;
+  padding: 20px;
 }
 
-.title {
-  font-size: 24px;
-  font-weight: 600;
-  margin-bottom: 8px;
-  color: var(--text-primary);
+/* 列表滑动动画 */
+.list-slide-enter-active {
+  transition:
+    transform 0.2s ease-out,
+    opacity 0.15s ease;
 }
 
-.description {
-  color: var(--text-secondary);
-  margin-bottom: 24px;
-  font-size: 14px;
+.list-slide-leave-active {
+  transition:
+    transform 0.2s ease-in,
+    opacity 0.15s ease;
+}
+
+.list-slide-enter-from {
+  transform: translateX(-100%);
+  opacity: 0;
+}
+
+.list-slide-enter-to {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+.list-slide-leave-from {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+.list-slide-leave-to {
+  transform: translateX(-100%);
+  opacity: 0;
+}
+
+/* 二级页面进入动画（不使用 Transition，直接用 CSS animation） */
+.detail-animate-slide {
+  animation: slideInFromRight 0.2s ease-out;
+}
+
+.detail-animate-slide-reverse {
+  animation: slideInFromLeft 0.2s ease-out;
+}
+
+@keyframes slideInFromRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideInFromLeft {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }
 
 .empty {
@@ -326,12 +398,6 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 8px;
-}
-
-.doc-list .empty {
-  text-align: center;
-  padding: 40px 20px;
-  color: var(--text-secondary);
 }
 
 .doc-detail-content {

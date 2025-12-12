@@ -1,105 +1,107 @@
 <template>
   <div class="plugin-market">
     <!-- 可滚动内容区 -->
-    <div v-show="!isDetailVisible" class="scrollable-content">
-      <div v-if="isLoading" class="loading-state">
-        <div class="loading-spinner"></div>
-        <span>加载中...</span>
-      </div>
-      <div v-else class="market-grid">
-        <div
-          v-for="plugin in plugins"
-          :key="plugin.name"
-          class="card plugin-card"
-          :title="plugin.description"
-          @click="openPluginDetail(plugin)"
-        >
-          <div class="plugin-icon">
-            <img :src="plugin.logo" class="plugin-logo-img" alt="icon" />
-          </div>
-          <div class="plugin-info">
-            <div class="plugin-name">{{ plugin.name }}</div>
-            <div class="plugin-description" :title="plugin.description">
-              {{ plugin.description }}
+    <Transition name="list-slide">
+      <div v-show="!isDetailVisible" class="scrollable-content">
+        <div v-if="isLoading" class="loading-state">
+          <div class="loading-spinner"></div>
+          <span>加载中...</span>
+        </div>
+        <div v-else class="market-grid">
+          <div
+            v-for="plugin in plugins"
+            :key="plugin.name"
+            class="card plugin-card"
+            :title="plugin.description"
+            @click="openPluginDetail(plugin)"
+          >
+            <div class="plugin-icon">
+              <img :src="plugin.logo" class="plugin-logo-img" alt="icon" />
             </div>
-          </div>
-          <div class="plugin-action">
-            <template v-if="plugin.installed">
-              <button
-                v-if="canUpgrade(plugin)"
-                class="btn btn-md btn-warning"
-                :disabled="installingPlugin === plugin.name"
-                @click.stop="handleUpgradePlugin(plugin)"
-              >
-                <div v-if="installingPlugin === plugin.name" class="btn-loading">
-                  <div class="spinner"></div>
-                </div>
-                <span v-else>升级</span>
-              </button>
+            <div class="plugin-info">
+              <div class="plugin-name">{{ plugin.name }}</div>
+              <div class="plugin-description" :title="plugin.description">
+                {{ plugin.description }}
+              </div>
+            </div>
+            <div class="plugin-action">
+              <template v-if="plugin.installed">
+                <button
+                  v-if="canUpgrade(plugin)"
+                  class="btn btn-md btn-warning"
+                  :disabled="installingPlugin === plugin.name"
+                  @click.stop="handleUpgradePlugin(plugin)"
+                >
+                  <div v-if="installingPlugin === plugin.name" class="btn-loading">
+                    <div class="spinner"></div>
+                  </div>
+                  <span v-else>升级</span>
+                </button>
+                <button
+                  v-else
+                  class="icon-btn open-btn"
+                  title="打开"
+                  @click.stop="handleOpenPlugin(plugin)"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                  </svg>
+                </button>
+              </template>
               <button
                 v-else
-                class="icon-btn open-btn"
-                title="打开"
-                @click.stop="handleOpenPlugin(plugin)"
+                class="icon-btn download-btn"
+                title="下载"
+                :disabled="installingPlugin === plugin.name"
+                @click.stop="downloadPlugin(plugin)"
               >
+                <div v-if="installingPlugin === plugin.name" class="spinner"></div>
                 <svg
-                  xmlns="http://www.w3.org/2000/svg"
+                  v-else
                   width="14"
                   height="14"
                   viewBox="0 0 24 24"
                   fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
+                  xmlns="http://www.w3.org/2000/svg"
                 >
-                  <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                  <path
+                    d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                  <path
+                    d="M7 10L12 15L17 10"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                  <path
+                    d="M12 15V3"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
                 </svg>
               </button>
-            </template>
-            <button
-              v-else
-              class="icon-btn download-btn"
-              title="下载"
-              :disabled="installingPlugin === plugin.name"
-              @click.stop="downloadPlugin(plugin)"
-            >
-              <div v-if="installingPlugin === plugin.name" class="spinner"></div>
-              <svg
-                v-else
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                />
-                <path
-                  d="M7 10L12 15L17 10"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                />
-                <path
-                  d="M12 15V3"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                />
-              </svg>
-            </button>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </Transition>
 
     <!-- 插件详情覆盖面板组件 -->
     <Transition name="slide">
@@ -328,15 +330,50 @@ onMounted(() => {
   height: 100%;
   display: flex;
   flex-direction: column;
+  overflow: hidden; /* 防止滑动时出现滚动条 */
 }
 
 /* 可滚动内容区 */
 .scrollable-content {
-  flex: 1;
+  position: absolute;
+  inset: 0;
   overflow-y: auto;
   overflow-x: hidden;
   padding: 20px;
   background: var(--bg-color);
+}
+
+/* 列表滑动动画 */
+.list-slide-enter-active {
+  transition:
+    transform 0.2s ease-out,
+    opacity 0.15s ease;
+}
+
+.list-slide-leave-active {
+  transition:
+    transform 0.2s ease-in,
+    opacity 0.15s ease;
+}
+
+.list-slide-enter-from {
+  transform: translateX(-100%);
+  opacity: 0;
+}
+
+.list-slide-enter-to {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+.list-slide-leave-from {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+.list-slide-leave-to {
+  transform: translateX(-100%);
+  opacity: 0;
 }
 
 .market-grid {

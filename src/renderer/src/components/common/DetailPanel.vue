@@ -28,6 +28,8 @@ const emit = defineEmits<{
 
 <style>
 /* 全局过渡动画类（供 Transition 组件使用） */
+
+/* slide: 从右进入，向右离开（用于一级↔二级） */
 .slide-enter-active {
   transition:
     transform 0.2s ease-out,
@@ -57,6 +59,39 @@ const emit = defineEmits<{
 
 .slide-leave-to {
   transform: translateX(100%);
+  opacity: 1;
+}
+
+/* slide-reverse: 从左进入，向左离开（用于二级↔三级） */
+.slide-reverse-enter-active {
+  transition:
+    transform 0.2s ease-out,
+    opacity 0.15s ease;
+}
+
+.slide-reverse-leave-active {
+  transition:
+    transform 0.18s ease-in,
+    opacity 0s;
+}
+
+.slide-reverse-enter-from {
+  transform: translateX(-100%);
+  opacity: 0;
+}
+
+.slide-reverse-enter-to {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+.slide-reverse-leave-from {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+.slide-reverse-leave-to {
+  transform: translateX(-100%);
   opacity: 1;
 }
 </style>

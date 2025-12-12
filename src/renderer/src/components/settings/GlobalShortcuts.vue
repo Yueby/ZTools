@@ -1,78 +1,80 @@
 <template>
   <div class="content-panel">
     <!-- 可滚动内容区 -->
-    <div v-show="!showEditor" class="scrollable-content">
-      <!-- 顶部添加按钮 -->
-      <div class="panel-header">
-        <button class="btn" @click="showAddEditor">添加快捷键</button>
-      </div>
-
-      <!-- 快捷键列表 -->
-      <div class="shortcut-list">
-        <div v-for="shortcut in shortcuts" :key="shortcut.id" class="card shortcut-item">
-          <div class="shortcut-info">
-            <div class="shortcut-key-display">{{ shortcut.shortcut }}</div>
-            <div class="shortcut-desc">{{ shortcut.target }}</div>
-          </div>
-
-          <div class="shortcut-meta">
-            <button
-              class="icon-btn edit-btn"
-              title="编辑"
-              :disabled="isDeleting"
-              @click="handleEdit(shortcut)"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-              </svg>
-            </button>
-            <button
-              class="icon-btn delete-btn"
-              title="删除"
-              :disabled="isDeleting"
-              @click="handleDelete(shortcut.id)"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <polyline points="3 6 5 6 21 6"></polyline>
-                <path
-                  d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
-                ></path>
-                <line x1="10" y1="11" x2="10" y2="17"></line>
-                <line x1="14" y1="11" x2="14" y2="17"></line>
-              </svg>
-            </button>
-          </div>
+    <Transition name="list-slide">
+      <div v-show="!showEditor" class="scrollable-content">
+        <!-- 顶部添加按钮 -->
+        <div class="panel-header">
+          <button class="btn" @click="showAddEditor">添加快捷键</button>
         </div>
 
-        <!-- 空状态 -->
-        <div v-if="shortcuts.length === 0" class="empty-state">
-          <Icon name="keyboard" :size="64" class="empty-icon" />
-          <div class="empty-text">暂无全局快捷键</div>
-          <div class="empty-hint">点击"添加快捷键"来创建你的第一个全局快捷键</div>
+        <!-- 快捷键列表 -->
+        <div class="shortcut-list">
+          <div v-for="shortcut in shortcuts" :key="shortcut.id" class="card shortcut-item">
+            <div class="shortcut-info">
+              <div class="shortcut-key-display">{{ shortcut.shortcut }}</div>
+              <div class="shortcut-desc">{{ shortcut.target }}</div>
+            </div>
+
+            <div class="shortcut-meta">
+              <button
+                class="icon-btn edit-btn"
+                title="编辑"
+                :disabled="isDeleting"
+                @click="handleEdit(shortcut)"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                </svg>
+              </button>
+              <button
+                class="icon-btn delete-btn"
+                title="删除"
+                :disabled="isDeleting"
+                @click="handleDelete(shortcut.id)"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path
+                    d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
+                  ></path>
+                  <line x1="10" y1="11" x2="10" y2="17"></line>
+                  <line x1="14" y1="11" x2="14" y2="17"></line>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- 空状态 -->
+          <div v-if="shortcuts.length === 0" class="empty-state">
+            <Icon name="keyboard" :size="64" class="empty-icon" />
+            <div class="empty-text">暂无全局快捷键</div>
+            <div class="empty-hint">点击"添加快捷键"来创建你的第一个全局快捷键</div>
+          </div>
         </div>
       </div>
-    </div>
+    </Transition>
 
     <!-- 快捷键编辑器覆盖面板组件 -->
     <Transition name="slide">
@@ -280,16 +282,54 @@ onMounted(() => {
 
 <style scoped>
 .content-panel {
-  position: relative;
+  position: relative; /* 使详情面板能够覆盖该区域 */
   height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* 防止滑动时出现滚动条 */
   background: var(--bg-color);
 }
 
+/* 可滚动内容区 */
 .scrollable-content {
-  height: 100%;
+  position: absolute;
+  inset: 0;
   overflow-y: auto;
   overflow-x: hidden;
   padding: 20px;
+}
+
+/* 列表滑动动画 */
+.list-slide-enter-active {
+  transition:
+    transform 0.2s ease-out,
+    opacity 0.15s ease;
+}
+
+.list-slide-leave-active {
+  transition:
+    transform 0.2s ease-in,
+    opacity 0.15s ease;
+}
+
+.list-slide-enter-from {
+  transform: translateX(-100%);
+  opacity: 0;
+}
+
+.list-slide-enter-to {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+.list-slide-leave-from {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+.list-slide-leave-to {
+  transform: translateX(-100%);
+  opacity: 0;
 }
 
 /* 顶部按钮 */

@@ -1,144 +1,146 @@
 <template>
   <div class="content-panel">
     <!-- 可滚动内容区 -->
-    <div v-show="!isDetailVisible" class="scrollable-content">
-      <div class="panel-header">
-        <div class="button-group">
-          <button class="btn btn-purple" :disabled="isImportingDev" @click="importDevPlugin">
-            {{ isImportingDev ? '添加中...' : '添加开发中插件' }}
-          </button>
-          <button class="btn" :disabled="isImporting" @click="importPlugin">
-            {{ isImporting ? '导入中...' : '导入本地插件' }}
-          </button>
-        </div>
-      </div>
-
-      <!-- 插件列表 -->
-      <div class="plugin-list">
-        <div
-          v-for="plugin in plugins"
-          :key="plugin.path"
-          class="card plugin-item"
-          :title="plugin.description"
-          @click="openPluginDetail(plugin)"
-        >
-          <img v-if="plugin.logo" :src="plugin.logo" class="plugin-icon" alt="插件图标" />
-          <div v-else class="plugin-icon-placeholder">🧩</div>
-
-          <div class="plugin-info">
-            <div class="plugin-name">
-              {{ plugin.name }}
-              <span class="plugin-version">v{{ plugin.version }}</span>
-              <span v-if="plugin.isDevelopment" class="dev-badge">开发中</span>
-            </div>
-            <div class="plugin-desc">{{ plugin.description || '暂无描述' }}</div>
-            <div v-if="isPluginRunning(plugin.path)" class="plugin-status running">
-              <span class="status-dot"></span>
-              运行中
-            </div>
-          </div>
-
-          <div class="plugin-meta">
-            <button
-              class="icon-btn open-btn"
-              title="打开插件"
-              @click.stop="handleOpenPlugin(plugin)"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <polygon points="5 3 19 12 5 21 5 3"></polygon>
-              </svg>
+    <Transition name="list-slide">
+      <div v-show="!isDetailVisible" class="scrollable-content">
+        <div class="panel-header">
+          <div class="button-group">
+            <button class="btn btn-purple" :disabled="isImportingDev" @click="importDevPlugin">
+              {{ isImportingDev ? '添加中...' : '添加开发中插件' }}
             </button>
-            <button
-              v-if="isPluginRunning(plugin.path)"
-              class="icon-btn kill-btn"
-              title="终止运行"
-              :disabled="isKilling"
-              @click.stop="handleKillPlugin(plugin)"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-              </svg>
-            </button>
-            <button
-              class="icon-btn reload-btn"
-              :disabled="isReloading"
-              title="重新加载 plugin.json 配置文件"
-              @click.stop="handleReloadPlugin(plugin)"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <polyline points="23 4 23 10 17 10"></polyline>
-                <polyline points="1 20 1 14 7 14"></polyline>
-                <path
-                  d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"
-                ></path>
-              </svg>
-            </button>
-            <button
-              class="icon-btn delete-btn"
-              title="删除插件"
-              :disabled="isDeleting"
-              @click.stop="handleDeletePlugin(plugin)"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <polyline points="3 6 5 6 21 6"></polyline>
-                <path
-                  d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
-                ></path>
-                <line x1="10" y1="11" x2="10" y2="17"></line>
-                <line x1="14" y1="11" x2="14" y2="17"></line>
-              </svg>
+            <button class="btn" :disabled="isImporting" @click="importPlugin">
+              {{ isImporting ? '导入中...' : '导入本地插件' }}
             </button>
           </div>
         </div>
 
-        <!-- 空状态 -->
-        <div v-if="!isLoading && plugins.length === 0" class="empty-state">
-          <Icon name="plugin" :size="64" class="empty-icon" />
-          <div class="empty-text">暂无插件</div>
-          <div class="empty-hint">点击"导入本地插件"来安装你的第一个插件</div>
+        <!-- 插件列表 -->
+        <div class="plugin-list">
+          <div
+            v-for="plugin in plugins"
+            :key="plugin.path"
+            class="card plugin-item"
+            :title="plugin.description"
+            @click="openPluginDetail(plugin)"
+          >
+            <img v-if="plugin.logo" :src="plugin.logo" class="plugin-icon" alt="插件图标" />
+            <div v-else class="plugin-icon-placeholder">🧩</div>
+
+            <div class="plugin-info">
+              <div class="plugin-name">
+                {{ plugin.name }}
+                <span class="plugin-version">v{{ plugin.version }}</span>
+                <span v-if="plugin.isDevelopment" class="dev-badge">开发中</span>
+              </div>
+              <div class="plugin-desc">{{ plugin.description || '暂无描述' }}</div>
+              <div v-if="isPluginRunning(plugin.path)" class="plugin-status running">
+                <span class="status-dot"></span>
+                运行中
+              </div>
+            </div>
+
+            <div class="plugin-meta">
+              <button
+                class="icon-btn open-btn"
+                title="打开插件"
+                @click.stop="handleOpenPlugin(plugin)"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                </svg>
+              </button>
+              <button
+                v-if="isPluginRunning(plugin.path)"
+                class="icon-btn kill-btn"
+                title="终止运行"
+                :disabled="isKilling"
+                @click.stop="handleKillPlugin(plugin)"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                </svg>
+              </button>
+              <button
+                class="icon-btn reload-btn"
+                :disabled="isReloading"
+                title="重新加载 plugin.json 配置文件"
+                @click.stop="handleReloadPlugin(plugin)"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <polyline points="23 4 23 10 17 10"></polyline>
+                  <polyline points="1 20 1 14 7 14"></polyline>
+                  <path
+                    d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"
+                  ></path>
+                </svg>
+              </button>
+              <button
+                class="icon-btn delete-btn"
+                title="删除插件"
+                :disabled="isDeleting"
+                @click.stop="handleDeletePlugin(plugin)"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path
+                    d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
+                  ></path>
+                  <line x1="10" y1="11" x2="10" y2="17"></line>
+                  <line x1="14" y1="11" x2="14" y2="17"></line>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- 空状态 -->
+          <div v-if="!isLoading && plugins.length === 0" class="empty-state">
+            <Icon name="plugin" :size="64" class="empty-icon" />
+            <div class="empty-text">暂无插件</div>
+            <div class="empty-hint">点击"导入本地插件"来安装你的第一个插件</div>
+          </div>
         </div>
       </div>
-    </div>
+    </Transition>
 
     <!-- 插件详情覆盖面板组件 -->
     <Transition name="slide">
@@ -368,15 +370,50 @@ function closePluginDetail(): void {
   height: 100%;
   display: flex;
   flex-direction: column;
+  overflow: hidden; /* 防止滑动时出现滚动条 */
 }
 
 /* 可滚动内容区 */
 .scrollable-content {
-  flex: 1;
+  position: absolute;
+  inset: 0;
   overflow-y: auto;
   overflow-x: hidden;
   padding: 20px;
   background: var(--bg-color);
+}
+
+/* 列表滑动动画 */
+.list-slide-enter-active {
+  transition:
+    transform 0.2s ease-out,
+    opacity 0.15s ease;
+}
+
+.list-slide-leave-active {
+  transition:
+    transform 0.2s ease-in,
+    opacity 0.15s ease;
+}
+
+.list-slide-enter-from {
+  transform: translateX(-100%);
+  opacity: 0;
+}
+
+.list-slide-enter-to {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+.list-slide-leave-from {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+.list-slide-leave-to {
+  transform: translateX(-100%);
+  opacity: 0;
 }
 
 /* 插件中心样式 */
