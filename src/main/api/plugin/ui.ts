@@ -1,4 +1,4 @@
-import { ipcMain, Notification, nativeTheme } from 'electron'
+import { ipcMain, nativeTheme, Notification } from 'electron'
 
 /**
  * 插件UI控制API - 插件专用

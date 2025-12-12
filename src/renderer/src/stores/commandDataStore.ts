@@ -264,17 +264,14 @@ export const useCommandDataStore = defineStore('commandData', () => {
               const featureIcon = feature.icon || plugin.logo
 
               for (const cmd of feature.cmds) {
-                // 忽略 files 和 img 类型的 cmd
-                if (typeof cmd === 'object' && (cmd.type === 'files' || cmd.type === 'img')) {
-                  continue
-                }
-                // cmd 可能是字符串、正则配置对象或 over 配置对象
+                // cmd 可能是字符串（功能指令）或对象（匹配指令）
                 const isMatchCmd =
-                  typeof cmd === 'object' && (cmd.type === 'regex' || cmd.type === 'over')
+                  typeof cmd === 'object' &&
+                  ['regex', 'over', 'img', 'files', 'window'].includes(cmd.type)
                 const cmdName = isMatchCmd ? cmd.label : cmd
 
                 if (isMatchCmd) {
-                  // 匹配指令项（regex 或 over）：不需要拼音搜索
+                  // 匹配指令项（regex、over、img、files、window）：不需要拼音搜索
                   regexItems.push({
                     name: cmdName,
                     path: plugin.path,
@@ -283,10 +280,10 @@ export const useCommandDataStore = defineStore('commandData', () => {
                     featureCode: feature.code,
                     pluginExplain: feature.explain,
                     matchCmd: cmd,
-                    cmdType: cmd.type // 标记为 regex 或 over 类型
+                    cmdType: cmd.type // 标记匹配类型
                   })
                 } else {
-                  // 功能指令
+                  // 功能指令（文本类型）
                   pluginItems.push({
                     name: cmdName,
                     path: plugin.path,

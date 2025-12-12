@@ -121,17 +121,33 @@
 
           <!-- 插件：按 feature 分组显示 -->
           <template v-else>
-            <div v-for="feature in groupedFeatures" :key="feature.code" class="card feature-card">
-              <template v-if="feature.textCmds.length > 0">
+            <div
+              v-for="feature in groupedFeatures"
+              v-show="feature.textCmds.length > 0"
+              :key="feature.code"
+              class="card feature-card"
+            >
+              <div class="feature-header">
+                <div v-if="feature.icon" class="feature-icon">
+                  <span v-if="feature.icon.length <= 2" class="icon-emoji">{{ feature.icon }}</span>
+                  <img
+                    v-else-if="!hasIconError(feature)"
+                    :src="feature.icon"
+                    @error="() => onIconError(feature)"
+                  />
+                  <div v-else class="icon-placeholder">
+                    {{ (feature.explain || feature.name).charAt(0).toUpperCase() }}
+                  </div>
+                </div>
                 <div class="feature-title">
                   {{ feature.explain || feature.name }}
                 </div>
-                <div class="feature-commands">
-                  <span v-for="(cmd, idx) in feature.textCmds" :key="idx" class="command-tag">
-                    {{ cmd.text }}
-                  </span>
-                </div>
-              </template>
+              </div>
+              <div class="feature-commands">
+                <span v-for="(cmd, idx) in feature.textCmds" :key="idx" class="command-tag">
+                  {{ cmd.text }}
+                </span>
+              </div>
             </div>
           </template>
         </div>
@@ -144,29 +160,68 @@
           </div>
 
           <!-- 插件：按 feature 分组显示 -->
-          <div v-for="feature in groupedFeatures" :key="feature.code" class="card feature-card">
-            <template v-if="feature.matchCmds.length > 0">
+          <div
+            v-for="feature in groupedFeatures"
+            v-show="feature.matchCmds.length > 0"
+            :key="feature.code"
+            class="card feature-card"
+          >
+            <div class="feature-header">
+              <div v-if="feature.icon" class="feature-icon">
+                <span v-if="feature.icon.length <= 2" class="icon-emoji">{{ feature.icon }}</span>
+                <img
+                  v-else-if="!hasIconError(feature)"
+                  :src="feature.icon"
+                  @error="() => onIconError(feature)"
+                />
+                <div v-else class="icon-placeholder">
+                  {{ (feature.explain || feature.name).charAt(0).toUpperCase() }}
+                </div>
+              </div>
               <div class="feature-title">
                 {{ feature.explain || feature.name }}
               </div>
-              <div class="feature-commands">
-                <span
-                  v-for="(cmd, idx) in feature.matchCmds"
-                  :key="idx"
-                  :class="['command-tag', `tag-${cmd.type}`]"
-                >
-                  <template v-if="cmd.type === 'regex'">
-                    <code class="tag-code">{{ cmd.match.match }}</code>
-                  </template>
-                  <template v-else-if="cmd.type === 'over'">
-                    <span class="tag-text"
-                      >长度 {{ cmd.match.minLength }}-{{ cmd.match.maxLength || 10000 }}</span
-                    >
-                  </template>
-                  <span class="tag-badge">{{ cmd.type === 'regex' ? '正则' : '任意' }}</span>
-                </span>
-              </div>
-            </template>
+            </div>
+            <div class="feature-commands">
+              <span
+                v-for="(cmd, idx) in feature.matchCmds"
+                :key="idx"
+                :class="['command-tag', `tag-${cmd.type}`]"
+              >
+                <template v-if="cmd.type === 'regex'">
+                  <code class="tag-code">{{ cmd.match.match }}</code>
+                  <span class="tag-badge">正则</span>
+                </template>
+                <template v-else-if="cmd.type === 'over'">
+                  <span class="tag-text"
+                    >长度 {{ cmd.match.minLength || 1 }}-{{ cmd.match.maxLength || 10000 }}</span
+                  >
+                  <span class="tag-badge">任意</span>
+                </template>
+                <template v-else-if="cmd.type === 'img'">
+                  <span class="tag-text">{{ cmd.name }}</span>
+                  <span class="tag-badge">图片</span>
+                </template>
+                <template v-else-if="cmd.type === 'files'">
+                  <span class="tag-text">{{ cmd.name }}</span>
+                  <span v-if="cmd.match.extensions" class="tag-info"
+                    >{{ cmd.match.extensions.slice(0, 3).join(', ')
+                    }}{{ cmd.match.extensions.length > 3 ? '...' : '' }}</span
+                  >
+                  <span class="tag-badge">{{
+                    cmd.match.fileType === 'directory' ? '文件夹' : '文件'
+                  }}</span>
+                </template>
+                <template v-else-if="cmd.type === 'window'">
+                  <span class="tag-text">{{ cmd.name }}</span>
+                  <span class="tag-badge">窗口</span>
+                </template>
+                <template v-else>
+                  <span class="tag-text">{{ cmd.name }}</span>
+                  <span class="tag-badge">{{ cmd.type }}</span>
+                </template>
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -318,29 +373,33 @@ const matchFeaturesCount = computed(() => {
 })
 
 // 图标加载失败处理
-function onIconError(cmd: any): void {
-  const key = `${cmd.path}-${cmd.featureCode || ''}-${cmd.name}`
+function onIconError(item: any): void {
+  // item 可能是 cmd 或 feature
+  const key = item.code
+    ? `feature-${item.code}-${item.icon}` // feature 对象
+    : `${item.path}-${item.featureCode || ''}-${item.name}` // cmd 对象
   iconErrors.value.add(key)
-  console.warn('图标加载失败:', cmd.name)
+  console.warn('图标加载失败:', item.name || item.explain || item.code)
 }
 
 // 检查图标是否加载失败
-function hasIconError(cmd: any): boolean {
-  const key = `${cmd.path}-${cmd.featureCode || ''}-${cmd.name}`
+function hasIconError(item: any): boolean {
+  const key = item.code
+    ? `feature-${item.code}-${item.icon}` // feature 对象
+    : `${item.path}-${item.featureCode || ''}-${item.name}` // cmd 对象
   return iconErrors.value.has(key)
 }
 
-// 获取插件功能数量（功能指令 + 匹配指令）
+// 获取插件功能数量（所有唯一的 featureCode）
 function getPluginCommandCount(plugin: any): number {
-  const textFeatureCodes = new Set<string>()
-  const matchFeatureCodes = new Set<string>()
+  const allFeatureCodes = new Set<string>()
 
   // 收集功能指令的 featureCode
   allCommands.value
     .filter((c) => c.type === 'plugin' && c.path === plugin.path && c.featureCode)
     .forEach((c) => {
       if (c.featureCode) {
-        textFeatureCodes.add(c.featureCode)
+        allFeatureCodes.add(c.featureCode)
       }
     })
 
@@ -349,12 +408,12 @@ function getPluginCommandCount(plugin: any): number {
     .filter((c) => c.path === plugin.path && c.featureCode)
     .forEach((c) => {
       if (c.featureCode) {
-        matchFeatureCodes.add(c.featureCode)
+        allFeatureCodes.add(c.featureCode)
       }
     })
 
-  // 返回两个 Tab 的功能数量之和
-  return textFeatureCodes.size + matchFeatureCodes.size
+  // 返回唯一功能数量（同一个 feature 不会被计数两次）
+  return allFeatureCodes.size
 }
 
 // 选择来源
@@ -590,7 +649,49 @@ onMounted(async () => {
   background: var(--hover-bg);
 }
 
+.feature-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.feature-icon {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.feature-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.feature-icon .icon-emoji {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.feature-icon .icon-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--control-bg);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 6px;
+}
+
 .feature-title {
+  flex: 1;
   font-size: 13px;
   font-weight: 500;
   color: var(--text-color);
@@ -648,6 +749,39 @@ onMounted(async () => {
   color: white;
 }
 
+/* 图片匹配指令 */
+.command-tag.tag-img {
+  background: var(--success-light-bg);
+  color: var(--success-color);
+}
+
+.command-tag.tag-img:hover {
+  background: var(--success-color);
+  color: white;
+}
+
+/* 文件匹配指令 */
+.command-tag.tag-files {
+  background: rgba(59, 130, 246, 0.1);
+  color: rgb(59, 130, 246);
+}
+
+.command-tag.tag-files:hover {
+  background: rgb(59, 130, 246);
+  color: white;
+}
+
+/* 窗口匹配指令 */
+.command-tag.tag-window {
+  background: rgba(234, 179, 8, 0.1);
+  color: rgb(234, 179, 8);
+}
+
+.command-tag.tag-window:hover {
+  background: rgb(234, 179, 8);
+  color: white;
+}
+
 /* 正则表达式代码 */
 .tag-code {
   font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
@@ -667,6 +801,15 @@ onMounted(async () => {
 .tag-text {
   font-size: 11px;
   opacity: 0.9;
+}
+
+/* 附加信息 */
+.tag-info {
+  font-size: 10px;
+  padding: 2px 6px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+  opacity: 0.8;
 }
 
 /* 类型徽章 */
