@@ -250,22 +250,25 @@ export class PluginsAPI {
   private async importDevPlugin(): Promise<any> {
     try {
       const result = await dialog.showOpenDialog(this.mainWindow!, {
-        title: '选择插件文件夹',
-        properties: ['openDirectory']
+        title: '选择插件配置文件',
+        properties: ['openFile'],
+        filters: [{ name: '插件配置', extensions: ['json'] }],
+        message: '请选择 plugin.json 文件'
       })
 
       if (result.canceled || result.filePaths.length === 0) {
-        return { success: false, error: '未选择文件夹' }
+        return { success: false, error: '未选择文件' }
       }
 
-      const pluginPath = result.filePaths[0]
-      const pluginJsonPath = path.join(pluginPath, 'plugin.json')
+      const pluginJsonPath = result.filePaths[0]
 
-      try {
-        await fs.access(pluginJsonPath)
-      } catch {
-        return { success: false, error: 'plugin.json 文件不存在' }
+      // 检查文件名是否为 plugin.json
+      if (path.basename(pluginJsonPath) !== 'plugin.json') {
+        return { success: false, error: '请选择 plugin.json 文件' }
       }
+
+      // 获取插件文件夹路径（plugin.json 所在的目录）
+      const pluginPath = path.dirname(pluginJsonPath)
 
       const pluginJsonContent = await fs.readFile(pluginJsonPath, 'utf-8')
       let pluginConfig: any

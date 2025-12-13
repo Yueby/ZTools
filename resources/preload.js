@@ -17,6 +17,9 @@ const pluginOutCallbacks = []
 const osType = electron.ipcRenderer.sendSync('get-os-type')
 
 window.ztools = {
+  getNativeId: () => "1234567890",
+  getAppVersion: () => "7.3.0",
+  getAppName: () => "zTools",
   // 平台检测
   isMacOs: () => osType === 'Darwin',
   isMacOS: () => osType === 'Darwin',
@@ -268,6 +271,8 @@ window.ztools = {
   dipToScreenPoint: (point) => electron.ipcRenderer.sendSync('dip-to-screen-point', point),
   // 屏幕物理坐标转 DIP 坐标
   screenToDipPoint: (point) => electron.ipcRenderer.sendSync('screen-to-dip-point', point),
+  // DIP 区域转屏幕物理区域
+  dipToScreenRect: (rect) => electron.ipcRenderer.sendSync('dip-to-screen-rect', rect),
   // 检查当前插件是否处于开发模式
   isDev: () => electron.ipcRenderer.sendSync('is-dev'),
   // 获取当前 WebContents ID

@@ -1,4 +1,4 @@
-import { ipcMain, screen, desktopCapturer } from 'electron'
+import { ipcMain, screen, desktopCapturer, BrowserWindow } from 'electron'
 import { screenCapture } from '../../core/screenCapture.js'
 import os from 'os'
 
@@ -43,6 +43,26 @@ export class PluginScreenAPI {
       const p = screen.dipToScreenPoint(point)
       event.returnValue = p
     })
+
+    // DIP 区域转屏幕物理区域
+    ipcMain.on(
+      'dip-to-screen-rect',
+      (event, rect: { x: number; y: number; width: number; height: number }) => {
+        // Mac 平台直接返回 rect
+        if (process.platform === 'darwin') {
+          event.returnValue = rect
+          return
+        }
+        const window = BrowserWindow.fromWebContents(event.sender)
+        if (!window) {
+          console.error('无法获取调用者的窗口')
+          event.returnValue = rect
+          return
+        }
+        const result = screen.dipToScreenRect(window, rect)
+        event.returnValue = result
+      }
+    )
 
     // 屏幕物理坐标转 DIP 坐标
     ipcMain.on('screen-to-dip-point', (event, point: Electron.Point) => {
