@@ -146,7 +146,11 @@ declare global {
       onWindowInfoChanged: (
         callback: (windowInfo: { appName: string; bundleId: string; timestamp: number }) => void
       ) => void
-      getLastCopiedText: (timeLimit: number) => Promise<string>
+      getLastCopiedContent: (timeLimit?: number) => Promise<{
+        type: 'text' | 'image' | 'file'
+        data: string | Array<{ isFile: boolean; isDirectory: boolean; name: string; path: string }>
+        timestamp: number
+      } | null>
       // 子输入框相关
       notifySubInputChange: (text: string) => void
       setSubInputValue: (text: string) => Promise<boolean>

@@ -7,6 +7,32 @@
         <img :src="pastedImage" alt="粘贴的图片" />
         <div class="clear-icon">×</div>
       </div>
+      <!-- 粘贴的文件显示 -->
+      <div v-if="pastedFiles && pastedFiles.length > 0" class="pasted-files" @click="clearPastedFiles">
+        <div class="file-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path
+              d="M13 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V9L13 2Z"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            <path
+              d="M13 2V9H20"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </div>
+        <div class="file-info">
+          <span class="file-name">{{ getFirstFileName(pastedFiles) }}</span>
+          <span v-if="pastedFiles.length > 1" class="file-count">+{{ pastedFiles.length - 1 }}</span>
+        </div>
+        <div class="clear-icon">×</div>
+      </div>
       <span ref="measureRef" class="measure-text"></span>
       <input
         ref="inputRef"
@@ -52,15 +78,24 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useWindowStore } from '../../stores/windowStore'
 import UpdateIcon from './UpdateIcon.vue'
 
+// FileItem 接口（从剪贴板管理器返回的格式）
+interface FileItem {
+  path: string
+  name: string
+  isDirectory: boolean
+}
+
 const props = defineProps<{
   modelValue: string
   pastedImage?: string | null
+  pastedFiles?: FileItem[] | null
   currentView?: string
 }>()
 
 const emit = defineEmits<{
   (e: 'update:modelValue', value: string): void
   (e: 'update:pastedImage', value: string | null): void
+  (e: 'update:pastedFiles', value: FileItem[] | null): void
   (e: 'keydown', event: KeyboardEvent): void
   (e: 'arrow-keydown', event: KeyboardEvent, direction: 'left' | 'right' | 'up' | 'down'): void
   (e: 'composing', isComposing: boolean): void
@@ -134,12 +169,16 @@ function onKeydown(event: KeyboardEvent): void {
     return
   }
 
-  // 如果有粘贴的图片，按 Backspace 或 Delete 键清除图片
-  if (props.pastedImage && (event.key === 'Backspace' || event.key === 'Delete')) {
-    // 如果输入框为空，清除图片
+  // 如果有粘贴的图片或文件，按 Backspace 或 Delete 键清除
+  if ((props.pastedImage || props.pastedFiles) && (event.key === 'Backspace' || event.key === 'Delete')) {
+    // 如果输入框为空，清除图片或文件
     if (!props.modelValue) {
       event.preventDefault()
-      clearPastedImage()
+      if (props.pastedImage) {
+        clearPastedImage()
+      } else if (props.pastedFiles) {
+        clearPastedFiles()
+      }
       return
     }
   }
@@ -157,29 +196,22 @@ function keydownEvent(event: KeyboardEvent, direction: 'left' | 'right' | 'up' |
 
 // 处理粘贴事件
 async function handlePaste(event: ClipboardEvent): Promise<void> {
-  const items = event.clipboardData?.items
-  if (!items) return
+  try {
+    // 手动粘贴不需要时间限制
+    const copiedContent = await window.ztools.getLastCopiedContent()
 
-  // 遍历粘贴的项目
-  for (let i = 0; i < items.length; i++) {
-    const item = items[i]
-
-    // 检查是否为图片
-    if (item.type.startsWith('image/')) {
+    if (copiedContent?.type === 'image') {
+      // 粘贴的是图片
       event.preventDefault() // 阻止默认粘贴行为
-
-      const file = item.getAsFile()
-      if (!file) continue
-
-      // 将图片转换为 base64
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        const base64 = e.target?.result as string
-        emit('update:pastedImage', base64)
-      }
-      reader.readAsDataURL(file)
-      break // 只处理第一张图片
+      emit('update:pastedImage', copiedContent.data as string)
+    } else if (copiedContent?.type === 'file') {
+      // 粘贴的是文件
+      event.preventDefault() // 阻止默认粘贴行为
+      emit('update:pastedFiles', copiedContent.data as FileItem[])
     }
+    // 文本类型不需要特殊处理，使用浏览器默认行为
+  } catch (error) {
+    console.error('处理粘贴失败:', error)
   }
 }
 
@@ -189,6 +221,20 @@ function clearPastedImage(): void {
   nextTick(() => {
     inputRef.value?.focus()
   })
+}
+
+// 清除粘贴的文件
+function clearPastedFiles(): void {
+  emit('update:pastedFiles', null)
+  nextTick(() => {
+    inputRef.value?.focus()
+  })
+}
+
+// 获取第一个文件的名称（用于显示）
+function getFirstFileName(files: FileItem[]): string {
+  if (files.length === 0) return ''
+  return files[0].name
 }
 
 function updateInputWidth(): void {
@@ -386,6 +432,62 @@ defineExpose({
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.pasted-files {
+  position: relative;
+  max-width: 200px;
+  height: 35px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border-radius: 4px;
+  background: var(--control-bg);
+  border: 1px solid var(--control-border);
+  cursor: pointer;
+  transition: all 0.2s;
+  -webkit-app-region: no-drag;
+}
+
+.pasted-files:hover {
+  background: var(--hover-bg);
+}
+
+.pasted-files:hover .clear-icon {
+  opacity: 1;
+}
+
+.file-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--text-color);
+  opacity: 0.7;
+}
+
+.file-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.file-name {
+  font-size: 14px;
+  color: var(--text-color);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-count {
+  font-size: 12px;
+  color: var(--text-secondary);
+  flex-shrink: 0;
 }
 
 .clear-icon {

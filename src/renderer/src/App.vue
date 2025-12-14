@@ -6,6 +6,7 @@
           ref="searchBoxRef"
           v-model="searchQuery"
           v-model:pasted-image="pastedImageData"
+          v-model:pasted-files="pastedFilesData"
           :current-view="currentView"
           @composing="handleComposing"
           @settings-click="handleSettingsClick"
@@ -19,6 +20,7 @@
         ref="searchResultsRef"
         :search-query="searchQuery"
         :pasted-image="pastedImageData"
+        :pasted-files="pastedFilesData"
         @height-changed="updateWindowHeight"
       />
 
@@ -41,6 +43,13 @@ import Settings from './components/settings/Settings.vue'
 import { useCommandDataStore } from './stores/commandDataStore'
 import { useWindowStore } from './stores/windowStore'
 
+// FileItem 接口（从剪贴板管理器返回的格式）
+interface FileItem {
+  path: string
+  name: string
+  isDirectory: boolean
+}
+
 enum ViewMode {
   Search = 'search',
   Settings = 'settings',
@@ -60,6 +69,8 @@ const searchResultsRef = ref<{
 } | null>(null)
 // 粘贴的图片数据
 const pastedImageData = ref<string | null>(null)
+// 粘贴的文件数据
+const pastedFilesData = ref<FileItem[] | null>(null)
 
 // 监听搜索框输入变化
 watch(searchQuery, (newValue) => {
@@ -67,17 +78,28 @@ watch(searchQuery, (newValue) => {
   if (currentView.value === ViewMode.Plugin && windowStore.currentPlugin) {
     window.ztools.notifySubInputChange(newValue)
   }
-  // 输入变化时清除粘贴的图片
-  if (newValue && pastedImageData.value) {
-    pastedImageData.value = null
+  // 输入变化时清除粘贴的图片和文件
+  if (newValue) {
+    if (pastedImageData.value) pastedImageData.value = null
+    if (pastedFilesData.value) pastedFilesData.value = null
   }
 })
 
 // 监听粘贴图片数据变化
 watch(pastedImageData, (newValue) => {
-  // 粘贴图片时清空搜索框文本
+  // 粘贴图片时清空搜索框文本和文件
   if (newValue) {
     searchQuery.value = ''
+    pastedFilesData.value = null
+  }
+})
+
+// 监听粘贴文件数据变化
+watch(pastedFilesData, (newValue) => {
+  // 粘贴文件时清空搜索框文本和图片
+  if (newValue) {
+    searchQuery.value = ''
+    pastedImageData.value = null
   }
 })
 
@@ -233,9 +255,10 @@ function handleKeydown(event: KeyboardEvent): void {
     }
 
     // 搜索页面
-    if (searchQuery.value.trim() || pastedImageData.value) {
+    if (searchQuery.value.trim() || pastedImageData.value || pastedFilesData.value) {
       searchQuery.value = ''
       pastedImageData.value = null
+      pastedFilesData.value = null
     } else {
       window.ztools.hideWindow()
     }
@@ -269,6 +292,7 @@ onMounted(async () => {
     }
     searchQuery.value = ''
     pastedImageData.value = null // 清除粘贴的图片
+    pastedFilesData.value = null // 清除粘贴的文件
     searchResultsRef.value?.resetSelection()
 
     // 隐藏插件视图
@@ -283,11 +307,21 @@ onMounted(async () => {
     const timeLimit = windowStore.getAutoPasteTimeLimit()
     if (timeLimit > 0) {
       try {
-        const copiedText = await window.ztools.getLastCopiedText(timeLimit)
-        if (copiedText) {
-          // 自动粘贴到搜索框
-          searchQuery.value = copiedText
-          console.log('自动粘贴:', copiedText)
+        const copiedContent = await window.ztools.getLastCopiedContent(timeLimit)
+        if (copiedContent) {
+          if (copiedContent.type === 'image') {
+            // 自动粘贴图片
+            pastedImageData.value = copiedContent.data as string
+            console.log('自动粘贴图片')
+          } else if (copiedContent.type === 'text') {
+            // 自动粘贴文本
+            searchQuery.value = copiedContent.data as string
+            console.log('自动粘贴文本:', copiedContent.data)
+          } else if (copiedContent.type === 'file') {
+            // 自动粘贴文件
+            pastedFilesData.value = copiedContent.data as FileItem[]
+            console.log('自动粘贴文件:', copiedContent.data)
+          }
         }
       } catch (error) {
         console.error('自动粘贴失败:', error)
@@ -325,8 +359,9 @@ onMounted(async () => {
   window.ztools.onPluginOpened((plugin) => {
     console.log('插件已打开:', plugin)
     windowStore.updateCurrentPlugin(plugin)
-    // 清除粘贴的图片
+    // 清除粘贴的图片和文件
     pastedImageData.value = null
+    pastedFilesData.value = null
   })
 
   // 监听插件关闭事件

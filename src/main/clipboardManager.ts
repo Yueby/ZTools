@@ -64,9 +64,10 @@ class ClipboardManager {
   private clipboardMonitor: ClipboardMonitor
   private windowMonitor: WindowMonitor
 
-  // 记录最后一次复制的文本信息
-  private lastCopiedText: {
-    content: string
+  // 记录最后一次复制的内容（统一管理）
+  private lastCopiedContent: {
+    type: 'text' | 'image' | 'file'
+    data: string | FileItem[] // text/image: string, file: FileItem[]
     timestamp: number
   } | null = null
 
@@ -243,6 +244,13 @@ class ClipboardManager {
         return null as any
       }
 
+      // 记录最后一次复制的文件列表（包含完整元数据）
+      this.lastCopiedContent = {
+        type: 'file',
+        data: files, // 存储完整的 FileItem 对象
+        timestamp: Date.now()
+      }
+
       // 生成 hash（基于所有文件路径）
       const hashContent = files.map((f) => f.path).join('|')
       const hash = createHash('md5').update(hashContent).digest('hex')
@@ -280,6 +288,14 @@ class ClipboardManager {
     try {
       const image = clipboard.readImage()
       const buffer = image.toPNG()
+
+      // 记录最后一次复制的图片（转为 base64）
+      const base64 = `data:image/png;base64,${buffer.toString('base64')}`
+      this.lastCopiedContent = {
+        type: 'image',
+        data: base64,
+        timestamp: Date.now()
+      }
 
       // 检查图片大小
       if (buffer.length > this.config.maxImageSize) {
@@ -329,8 +345,9 @@ class ClipboardManager {
     }
 
     // 记录最后一次复制的文本
-    this.lastCopiedText = {
-      content: text,
+    this.lastCopiedContent = {
+      type: 'text',
+      data: text,
       timestamp: Date.now()
     }
 
@@ -763,21 +780,38 @@ class ClipboardManager {
     }
   }
 
-  // 获取最后一次复制的文本（在指定时间内）
+  // 获取最后一次复制的文本（在指定时间内）- 兼容旧 API
   public getLastCopiedText(timeLimit: number): string | null {
-    if (!this.lastCopiedText) {
+    const content = this.getLastCopiedContent(timeLimit)
+    return content?.type === 'text' ? (content.data as string) : null
+  }
+
+  // 获取最后复制的图片（自动粘贴功能）- 兼容旧 API
+  public getLastCopiedImage(timeLimit: number): string | null {
+    const content = this.getLastCopiedContent(timeLimit)
+    return content?.type === 'image' ? (content.data as string) : null
+  }
+
+  // 获取最后复制的内容（统一接口）
+  public getLastCopiedContent(
+    timeLimit?: number // 可选：时间限制（毫秒），不传或传 0 表示无时间限制
+  ): { type: 'text' | 'image' | 'file'; data: string | FileItem[]; timestamp: number } | null {
+    if (!this.lastCopiedContent) {
       return null
     }
 
-    const now = Date.now()
-    const elapsed = now - this.lastCopiedText.timestamp
+    // 如果指定了时间限制，检查是否超时
+    if (timeLimit && timeLimit > 0) {
+      const now = Date.now()
+      const elapsed = now - this.lastCopiedContent.timestamp
 
-    // 如果超过时间限制，返回 null
-    if (elapsed > timeLimit) {
-      return null
+      // 如果超过时间限制，返回 null
+      if (elapsed > timeLimit) {
+        return null
+      }
     }
 
-    return this.lastCopiedText.content
+    return this.lastCopiedContent
   }
 
   // 获取状态

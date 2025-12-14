@@ -29,7 +29,8 @@ const api = {
   copyToClipboard: (text: string) => ipcRenderer.invoke('copy-to-clipboard', text),
   openTerminal: (path: string) => ipcRenderer.invoke('open-terminal', path),
   getFinderPath: () => ipcRenderer.invoke('get-finder-path'),
-  getLastCopiedText: (timeLimit: number) => ipcRenderer.invoke('get-last-copied-text', timeLimit),
+  getLastCopiedContent: (timeLimit?: number) =>
+    ipcRenderer.invoke('get-last-copied-content', timeLimit),
   getFrontmostApp: () => ipcRenderer.invoke('get-frontmost-app'),
   activateApp: (identifier: string, type?: 'name' | 'bundleId' | 'path') =>
     ipcRenderer.invoke('activate-app', identifier, type),

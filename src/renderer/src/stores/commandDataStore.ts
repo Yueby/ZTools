@@ -26,8 +26,19 @@ interface ImgCmd {
   label: string
 }
 
+// Files 匹配指令
+interface FilesCmd {
+  type: 'files'
+  label: string
+  fileType?: 'file' | 'directory' // 文件类型
+  extensions?: string[] // 文件扩展名
+  match?: string // 匹配文件(夹)名称的正则表达式字符串
+  minLength?: number // 最少文件数
+  maxLength?: number // 最多文件数
+}
+
 // 匹配指令联合类型
-type MatchCmd = RegexCmd | OverCmd | ImgCmd
+type MatchCmd = RegexCmd | OverCmd | ImgCmd | FilesCmd
 
 // 指令类型枚举
 export type CommandType =
@@ -51,8 +62,8 @@ export interface Command {
   subType?: CommandSubType // 子类型（用于区分 direct 类型）
   featureCode?: string // 插件功能代码（用于启动时指定功能）
   pluginExplain?: string // 插件功能说明
-  matchCmd?: MatchCmd // 匹配指令配置（regex 或 over 或 img）
-  cmdType?: 'text' | 'regex' | 'over' | 'img' // cmd类型：text=字符串，regex=正则表达式，over=任意文本匹配，img=图片
+  matchCmd?: MatchCmd // 匹配指令配置（regex 或 over 或 img 或 files）
+  cmdType?: 'text' | 'regex' | 'over' | 'img' | 'files' // cmd类型
   matches?: MatchInfo[] // 搜索匹配信息（用于高亮显示）
   // 系统设置字段（新增）
   settingUri?: string // ms-settings URI
@@ -502,6 +513,71 @@ export const useCommandDataStore = defineStore('commandData', () => {
     return regexCommands.value.filter((cmd) => cmd.matchCmd?.type === 'img')
   }
 
+  // 搜索支持文件的指令（根据配置属性过滤）
+  function searchFileCommands(
+    pastedFiles?: Array<{ path: string; name: string; isDirectory: boolean }>
+  ): SearchResult[] {
+    if (!pastedFiles || pastedFiles.length === 0) {
+      return []
+    }
+
+    return regexCommands.value.filter((cmd) => {
+      if (cmd.matchCmd?.type !== 'files') {
+        return false
+      }
+
+      const filesCmd = cmd.matchCmd as FilesCmd
+
+      // 1. 检查文件数量是否满足要求
+      const fileCount = pastedFiles.length
+      const minLength = filesCmd.minLength ?? 1
+      const maxLength = filesCmd.maxLength ?? 10000
+
+      if (fileCount < minLength || fileCount > maxLength) {
+        return false
+      }
+
+      // 2. 检查每个文件是否满足条件
+      const allFilesMatch = pastedFiles.every((file) => {
+        // 2.1 检查文件类型（file 或 directory）
+        if (filesCmd.fileType) {
+          if (filesCmd.fileType === 'file' && file.isDirectory) {
+            return false
+          }
+          if (filesCmd.fileType === 'directory' && !file.isDirectory) {
+            return false
+          }
+        }
+
+        // 2.2 检查文件扩展名（只对文件有效，不检查文件夹）
+        if (filesCmd.extensions && !file.isDirectory) {
+          const ext = file.name.split('.').pop()?.toLowerCase()
+          if (!ext || !filesCmd.extensions.map((e) => e.toLowerCase()).includes(ext)) {
+            return false
+          }
+        }
+
+        // 2.3 检查正则表达式匹配
+        if (filesCmd.match) {
+          try {
+            const matchStr = filesCmd.match.replace(/^\/|\/[gimuy]*$/g, '')
+            const regex = new RegExp(matchStr)
+            if (!regex.test(file.name)) {
+              return false
+            }
+          } catch (error) {
+            console.error(`正则表达式 ${filesCmd.match} 解析失败:`, error)
+            return false
+          }
+        }
+
+        return true
+      })
+
+      return allFilesMatch
+    })
+  }
+
   // ==================== 历史记录相关 ====================
 
   // 保存历史记录到数据库
@@ -664,6 +740,7 @@ export const useCommandDataStore = defineStore('commandData', () => {
     loadCommands,
     search,
     searchImageCommands,
+    searchFileCommands,
     reloadUserData,
 
     // 指令历史记录方法（添加由后端处理）

@@ -27,8 +27,8 @@ export class SystemAPI {
     // 系统集成
     ipcMain.handle('open-terminal', (_event, path: string) => this.openTerminal(path))
     ipcMain.handle('get-finder-path', () => this.getFinderPath())
-    ipcMain.handle('get-last-copied-text', (_event, timeLimit: number) =>
-      this.getLastCopiedText(timeLimit)
+    ipcMain.handle('get-last-copied-content', (_event, timeLimit?: number) =>
+      this.getLastCopiedContent(timeLimit)
     )
     ipcMain.handle('get-frontmost-app', () => this.getFrontmostApp())
     ipcMain.handle('activate-app', (_event, identifier: string, type?: string) =>
@@ -85,11 +85,15 @@ export class SystemAPI {
     }
   }
 
-  private getLastCopiedText(timeLimit: number): string | null {
+  private getLastCopiedContent(timeLimit?: number): {
+    type: 'text' | 'image' | 'file'
+    data: string | Array<{ path: string; name: string; isDirectory: boolean }>
+    timestamp: number
+  } | null {
     try {
-      return clipboardManager.getLastCopiedText(timeLimit)
+      return clipboardManager.getLastCopiedContent(timeLimit)
     } catch (error) {
-      console.error('获取最后复制文本失败:', error)
+      console.error('获取最后复制内容失败:', error)
       return null
     }
   }
