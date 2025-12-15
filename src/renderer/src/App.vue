@@ -64,7 +64,7 @@ const appDataStore = useCommandDataStore()
 const searchQuery = ref('')
 const isComposing = ref(false)
 const currentView = ref<ViewMode>(ViewMode.Search)
-const searchBoxRef = ref<{ focus: () => void } | null>(null)
+const searchBoxRef = ref<{ focus: () => void; selectAll: () => void } | null>(null)
 const searchResultsRef = ref<{
   handleKeydown: (e: KeyboardEvent) => void
   resetSelection: () => void
@@ -309,7 +309,9 @@ onMounted(async () => {
     }
 
     // 根据自动清空配置决定是否清空搜索框（会自动记录时间）
-    if (windowStore.shouldClearSearch()) {
+    const shouldClear = windowStore.shouldClearSearch()
+    
+    if (shouldClear) {
       searchQuery.value = ''
       pastedImageData.value = null // 清除粘贴的图片
       pastedFilesData.value = null // 清除粘贴的文件
@@ -324,6 +326,10 @@ onMounted(async () => {
     // 聚焦输入框
     nextTick(() => {
       searchBoxRef.value?.focus()
+      // 如果没有清空搜索框，选中所有文本，方便用户直接输入覆盖
+      if (!shouldClear && searchQuery.value) {
+        searchBoxRef.value?.selectAll()
+      }
     })
 
     // 检查是否需要自动粘贴

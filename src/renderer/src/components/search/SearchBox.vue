@@ -416,7 +416,8 @@ async function handleUpdateClick(): Promise<void> {
 }
 
 defineExpose({
-  focus: () => inputRef.value?.focus()
+  focus: () => inputRef.value?.focus(),
+  selectAll: () => inputRef.value?.select()
 })
 </script>
 
