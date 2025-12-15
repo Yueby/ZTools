@@ -125,6 +125,28 @@
           @blur="handlePlaceholderChange"
           @keyup.enter="handlePlaceholderChange"
         />
+        <button
+          v-if="windowStore.placeholder !== defaultPlaceholder"
+          class="btn btn-icon"
+          title="重置"
+          @click="handleResetPlaceholder"
+        >
+          <svg
+            width="20"
+            height="20"
+            viewBox="1 0 18 18"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M14.5 9C14.5 11.4853 12.4853 13.5 10 13.5C7.51472 13.5 5.5 11.4853 5.5 9C5.5 6.51472 7.51472 4.5 10 4.5C11.6569 4.5 13.0943 5.41421 13.8536 6.75M14 4V7H11"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </button>
       </div>
     </div>
 
@@ -180,6 +202,25 @@
           <option value="3s">3秒内</option>
           <option value="5s">5秒内</option>
           <option value="10s">10秒内</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- 自动清空搜索框设置 -->
+    <div class="setting-item">
+      <div class="setting-label">
+        <span>自动清空搜索框</span>
+        <span class="setting-desc">窗口显示状态切换后自动清空搜索框内容的时间</span>
+      </div>
+      <div class="setting-control">
+        <select v-model="windowStore.autoClear" class="select" @change="handleAutoClearChange">
+          <option value="immediately">立即</option>
+          <option value="1m">1分钟</option>
+          <option value="2m">2分钟</option>
+          <option value="3m">3分钟</option>
+          <option value="5m">5分钟</option>
+          <option value="10m">10分钟</option>
+          <option value="never">从不</option>
         </select>
       </div>
     </div>
@@ -252,7 +293,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { useWindowStore } from '../../stores/windowStore'
+import { DEFAULT_PLACEHOLDER, useWindowStore } from '../../stores/windowStore'
 
 const windowStore = useWindowStore()
 
@@ -292,6 +333,9 @@ const customColor = ref('#db2777')
 
 // 头像默认值（用于重置）
 const defaultAvatar = new URL('../../assets/image/default.png', import.meta.url).href
+
+// 搜索框提示文字默认值（从 windowStore 导入）
+const defaultPlaceholder = DEFAULT_PLACEHOLDER
 
 // 显示的快捷键文本
 const displayHotkey = computed(() => {
@@ -445,13 +489,24 @@ async function handlePlaceholderChange(): Promise<void> {
   try {
     // 如果为空，恢复默认值
     if (!windowStore.placeholder.trim()) {
-      windowStore.updatePlaceholder('')
+      windowStore.updatePlaceholder(defaultPlaceholder)
     }
     // 保存到数据库
     await saveSettings()
     console.log('搜索框提示文字已更新:', windowStore.placeholder)
   } catch (error) {
     console.error('保存搜索框提示文字失败:', error)
+  }
+}
+
+// 重置搜索框提示文字
+async function handleResetPlaceholder(): Promise<void> {
+  try {
+    windowStore.updatePlaceholder(defaultPlaceholder)
+    await saveSettings()
+    console.log('搜索框提示文字已重置')
+  } catch (error) {
+    console.error('重置搜索框提示文字失败:', error)
   }
 }
 
@@ -489,6 +544,16 @@ async function handleAutoPasteChange(): Promise<void> {
     console.log('自动粘贴配置已更新:', windowStore.autoPaste)
   } catch (error) {
     console.error('保存自动粘贴配置失败:', error)
+  }
+}
+
+// 处理自动清空配置变化
+async function handleAutoClearChange(): Promise<void> {
+  try {
+    await saveSettings()
+    console.log('自动清空配置已更新:', windowStore.autoClear)
+  } catch (error) {
+    console.error('保存自动清空配置失败:', error)
   }
 }
 
@@ -681,6 +746,7 @@ async function saveSettings(): Promise<void> {
       placeholder: windowStore.placeholder,
       avatar: avatarToSave,
       autoPaste: windowStore.autoPaste,
+      autoClear: windowStore.autoClear,
       hideOnBlur: windowStore.hideOnBlur,
       theme: windowStore.theme,
       primaryColor: windowStore.primaryColor,

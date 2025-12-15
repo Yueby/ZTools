@@ -1,6 +1,6 @@
-import { ipcMain, nativeTheme, app, globalShortcut } from 'electron'
+import { app, globalShortcut, ipcMain, nativeTheme } from 'electron'
+import { getCurrentShortcut, updateShortcut } from '../../index.js'
 import windowManager from '../../windowManager.js'
-import { updateShortcut, getCurrentShortcut } from '../../index.js'
 import databaseAPI from '../shared/database'
 
 /**
@@ -75,12 +75,8 @@ export class SettingsAPI {
         }
       }
 
-      // 恢复窗口位置
-      const position = await databaseAPI.dbGet('window-position')
-      if (position && typeof position.x === 'number' && typeof position.y === 'number') {
-        this.mainWindow?.setPosition(position.x, position.y)
-        console.log('恢复窗口位置:', position)
-      }
+      // 窗口位置现在由 windowManager.moveWindowToCursor() 处理
+      // 每个显示器会自动恢复该显示器上次保存的位置
 
       // 加载并注册全局快捷键
       await this.loadAndRegisterGlobalShortcuts()

@@ -19,7 +19,7 @@ export function getCurrentShortcut(): string {
   return windowManager.getCurrentShortcut()
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   // 隐藏 Dock 图标
   if (platform.isMacOS) {
     app.dock?.hide()
@@ -27,6 +27,9 @@ app.whenReady().then(() => {
 
   // 创建主窗口
   const mainWindow = windowManager.createWindow()
+
+  // 加载窗口位置数据到内存（优化性能）
+  await windowManager.loadWindowPositions()
 
   // 初始化 API 和插件管理器
   if (mainWindow) {

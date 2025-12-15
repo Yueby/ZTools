@@ -1,6 +1,5 @@
 import { ipcMain } from 'electron'
 import windowManager from '../../windowManager.js'
-import databaseAPI from '../shared/database'
 
 /**
  * 窗口管理API - 主程序专用
@@ -17,6 +16,10 @@ export class WindowAPI {
   private setupIPC(): void {
     ipcMain.on('hide-window', () => this.hideWindow())
     ipcMain.on('resize-window', (_event, height: number) => this.resizeWindow(height))
+    ipcMain.handle('get-window-position', () => this.getWindowPosition())
+    ipcMain.on('set-window-position', (_event, x: number, y: number) =>
+      this.setWindowPosition(x, y)
+    )
     ipcMain.on('set-window-opacity', (_event, opacity: number) => this.setWindowOpacity(opacity))
     ipcMain.handle('set-tray-icon-visible', (_event, visible: boolean) =>
       this.setTrayIconVisible(visible)
@@ -25,15 +28,20 @@ export class WindowAPI {
   }
 
   private setupWindowEvents(): void {
-    // 监听窗口移动事件，保存位置
+    // 监听窗口移动事件，按显示器分别保存位置
     let moveTimeout: NodeJS.Timeout | null = null
     this.mainWindow?.on('move', () => {
       if (moveTimeout) clearTimeout(moveTimeout)
       moveTimeout = setTimeout(() => {
         if (this.mainWindow) {
           const [x, y] = this.mainWindow.getPosition()
-          databaseAPI.dbPut('window-position', { x, y })
-          console.log('保存窗口位置:', { x, y })
+          const displayId = windowManager.getCurrentDisplayId()
+
+          if (displayId !== null) {
+            // 通过 windowManager 保存位置（异步，不阻塞）
+            windowManager.saveWindowPosition(displayId, x, y)
+            console.log(`保存窗口位置到显示器 ${displayId}:`, { x, y })
+          }
         }
       }, 500) // 500ms 防抖
     })
@@ -50,6 +58,20 @@ export class WindowAPI {
       // 限制高度范围: 最小 59px, 最大 600px
       const newHeight = Math.max(59, Math.min(height, 600))
       this.mainWindow.setSize(width, newHeight)
+    }
+  }
+
+  public getWindowPosition(): { x: number; y: number } {
+    if (this.mainWindow) {
+      const [x, y] = this.mainWindow.getPosition()
+      return { x, y }
+    }
+    return { x: 0, y: 0 }
+  }
+
+  public setWindowPosition(x: number, y: number): void {
+    if (this.mainWindow) {
+      this.mainWindow.setPosition(x, y)
     }
   }
 

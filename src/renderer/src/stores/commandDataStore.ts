@@ -2,6 +2,7 @@ import Fuse from 'fuse.js'
 import { defineStore } from 'pinia'
 import { pinyin } from 'pinyin-pro'
 import { nextTick, ref } from 'vue'
+import arrowBackwardIcon from '../assets/image/arrow-backward.png'
 
 // 正则匹配指令
 interface RegexCmd {
@@ -89,6 +90,16 @@ const HISTORY_DOC_ID = 'command-history'
 const PINNED_DOC_ID = 'pinned-commands'
 
 export const useCommandDataStore = defineStore('commandData', () => {
+  // ===== 特殊指令配置表 =====
+  const specialCommands: Record<string, Partial<Command>> = {
+    'special:last-match': {
+      name: '上次匹配',
+      icon: arrowBackwardIcon,
+      type: 'builtin',
+      cmdType: 'text'
+    }
+  }
+
   // 历史记录
   const history = ref<HistoryItem[]>([])
   // 固定指令
@@ -288,7 +299,7 @@ export const useCommandDataStore = defineStore('commandData', () => {
                 const cmdName = isMatchCmd ? cmd.label : cmd
 
                 if (isMatchCmd) {
-                  // 匹配指令项（regex、over、img、files、window）：不需要拼音搜索
+                  // 匹配指令项（regex、over、img、files、window）：也需要拼音搜索
                   regexItems.push({
                     name: cmdName,
                     path: plugin.path,
@@ -297,7 +308,17 @@ export const useCommandDataStore = defineStore('commandData', () => {
                     featureCode: feature.code,
                     pluginExplain: feature.explain,
                     matchCmd: cmd,
-                    cmdType: cmd.type // 标记匹配类型
+                    cmdType: cmd.type, // 标记匹配类型
+                    pinyin: pinyin(cmdName, { toneType: 'none', type: 'string' })
+                      .replace(/\s+/g, '')
+                      .toLowerCase(),
+                    pinyinAbbr: pinyin(cmdName, {
+                      pattern: 'first',
+                      toneType: 'none',
+                      type: 'string'
+                    })
+                      .replace(/\s+/g, '')
+                      .toLowerCase()
                   })
                 } else {
                   // 功能指令（文本类型）
@@ -427,16 +448,37 @@ export const useCommandDataStore = defineStore('commandData', () => {
   }
 
   // 搜索
-  function search(query: string): { bestMatches: SearchResult[]; regexMatches: SearchResult[] } {
+  function search(
+    query: string,
+    commandList?: SearchResult[]
+  ): { bestMatches: SearchResult[]; regexMatches: SearchResult[] } {
+    // 如果没有指定搜索范围，使用全局指令
+    const searchTarget = commandList || commands.value
+
     if (!query || !fuse.value) {
       return {
-        bestMatches: commands.value.filter((cmd) => cmd.type === 'direct' && cmd.subType === 'app'), // 无搜索时只显示应用
+        bestMatches: searchTarget.filter((cmd) => cmd.type === 'direct' && cmd.subType === 'app'), // 无搜索时只显示应用
         regexMatches: []
       }
     }
 
     // 1. Fuse.js 模糊搜索
-    const fuseResults = fuse.value.search(query)
+    // 如果指定了搜索范围，创建临时 Fuse 实例
+    const searchFuse = commandList
+      ? new Fuse(commandList, {
+          keys: [
+            { name: 'name', weight: 2 },
+            { name: 'pinyin', weight: 1.5 },
+            { name: 'pinyinAbbr', weight: 1 }
+          ],
+          threshold: 0,
+          ignoreLocation: true,
+          includeScore: true,
+          includeMatches: true
+        })
+      : fuse.value
+
+    const fuseResults = searchFuse.search(query)
     const bestMatches = fuseResults
       .map((r) => ({
         ...r.item,
@@ -504,13 +546,53 @@ export const useCommandDataStore = defineStore('commandData', () => {
       }
     }
 
+    // 如果指定了搜索范围（用于粘贴内容的二次搜索），不需要 regexMatches
+    if (commandList) {
+      return { bestMatches, regexMatches: [] }
+    }
+
     // 分别返回模糊匹配和正则匹配结果
     return { bestMatches, regexMatches }
   }
 
   // 搜索支持图片的指令
   function searchImageCommands(): SearchResult[] {
-    return regexCommands.value.filter((cmd) => cmd.matchCmd?.type === 'img')
+    const result = regexCommands.value.filter((cmd) => cmd.matchCmd?.type === 'img')
+    console.log('searchImageCommands:', {
+      total: regexCommands.value.length,
+      imgCommands: result.length,
+      allTypes: regexCommands.value.map((c) => c.matchCmd?.type)
+    })
+    return result
+  }
+
+  // 搜索支持文本的指令（根据文本长度过滤）
+  function searchTextCommands(pastedText?: string): SearchResult[] {
+    if (!pastedText) {
+      return []
+    }
+
+    const result = regexCommands.value.filter((cmd) => {
+      if (cmd.matchCmd?.type !== 'over') {
+        return false
+      }
+
+      const textLength = pastedText.length
+      const minLength = cmd.matchCmd.minLength ?? 1
+      const maxLength = cmd.matchCmd.maxLength ?? 10000
+
+      return textLength >= minLength && textLength <= maxLength
+    })
+
+    console.log('searchTextCommands:', {
+      total: regexCommands.value.length,
+      textLength: pastedText.length,
+      overCommands: regexCommands.value.filter((c) => c.matchCmd?.type === 'over').length,
+      matched: result.length,
+      allTypes: regexCommands.value.map((c) => c.matchCmd?.type)
+    })
+
+    return result
   }
 
   // 搜索支持文件的指令（根据配置属性过滤）
@@ -521,11 +603,9 @@ export const useCommandDataStore = defineStore('commandData', () => {
       return []
     }
 
-    return regexCommands.value.filter((cmd) => {
-      if (cmd.matchCmd?.type !== 'files') {
-        return false
-      }
+    const filesCommandsList = regexCommands.value.filter((c) => c.matchCmd?.type === 'files')
 
+    const result = filesCommandsList.filter((cmd) => {
       const filesCmd = cmd.matchCmd as FilesCmd
 
       // 1. 检查文件数量是否满足要求
@@ -533,18 +613,35 @@ export const useCommandDataStore = defineStore('commandData', () => {
       const minLength = filesCmd.minLength ?? 1
       const maxLength = filesCmd.maxLength ?? 10000
 
+      console.log(`检查指令 "${cmd.name}":`, {
+        fileCount,
+        minLength,
+        maxLength,
+        countCheck: fileCount >= minLength && fileCount <= maxLength
+      })
+
       if (fileCount < minLength || fileCount > maxLength) {
+        console.log(`❌ 指令 "${cmd.name}" 文件数量不符合`)
         return false
       }
 
       // 2. 检查每个文件是否满足条件
       const allFilesMatch = pastedFiles.every((file) => {
+        console.log(`检查文件 "${file.name}":`, {
+          isDirectory: file.isDirectory,
+          fileType: filesCmd.fileType,
+          extensions: filesCmd.extensions,
+          match: filesCmd.match
+        })
+
         // 2.1 检查文件类型（file 或 directory）
         if (filesCmd.fileType) {
           if (filesCmd.fileType === 'file' && file.isDirectory) {
+            console.log(`❌ 文件 "${file.name}" 类型不匹配：需要文件但是文件夹`)
             return false
           }
           if (filesCmd.fileType === 'directory' && !file.isDirectory) {
+            console.log(`❌ 文件 "${file.name}" 类型不匹配：需要文件夹但是文件`)
             return false
           }
         }
@@ -552,7 +649,10 @@ export const useCommandDataStore = defineStore('commandData', () => {
         // 2.2 检查文件扩展名（只对文件有效，不检查文件夹）
         if (filesCmd.extensions && !file.isDirectory) {
           const ext = file.name.split('.').pop()?.toLowerCase()
-          if (!ext || !filesCmd.extensions.map((e) => e.toLowerCase()).includes(ext)) {
+          const allowedExts = filesCmd.extensions.map((e) => e.toLowerCase())
+          console.log(`检查扩展名: ${ext}, 允许的: [${allowedExts.join(', ')}]`)
+          if (!ext || !allowedExts.includes(ext)) {
+            console.log(`❌ 文件 "${file.name}" 扩展名不匹配`)
             return false
           }
         }
@@ -562,7 +662,10 @@ export const useCommandDataStore = defineStore('commandData', () => {
           try {
             const matchStr = filesCmd.match.replace(/^\/|\/[gimuy]*$/g, '')
             const regex = new RegExp(matchStr)
-            if (!regex.test(file.name)) {
+            const testResult = regex.test(file.name)
+            console.log(`检查正则匹配: ${matchStr}, 结果: ${testResult}`)
+            if (!testResult) {
+              console.log(`❌ 文件 "${file.name}" 正则不匹配`)
               return false
             }
           } catch (error) {
@@ -571,11 +674,41 @@ export const useCommandDataStore = defineStore('commandData', () => {
           }
         }
 
+        console.log(`✅ 文件 "${file.name}" 通过所有检查`)
         return true
       })
 
+      if (allFilesMatch) {
+        console.log(`✅ 指令 "${cmd.name}" 匹配成功`)
+      } else {
+        console.log(`❌ 指令 "${cmd.name}" 部分文件不匹配`)
+      }
+
       return allFilesMatch
     })
+
+    console.log('searchFileCommands:', {
+      total: regexCommands.value.length,
+      fileCount: pastedFiles.length,
+      filesCommands: regexCommands.value.filter((c) => c.matchCmd?.type === 'files').length,
+      matched: result.length,
+      allTypes: regexCommands.value.map((c) => c.matchCmd?.type),
+      pastedFiles: pastedFiles.map((f) => ({ name: f.name, isDir: f.isDirectory }))
+    })
+
+    return result
+  }
+
+  // 在指定的指令列表中搜索（用于粘贴内容后的二次搜索）
+  // 统一使用 search 函数，只是传入不同的指令列表
+  function searchInCommands(commandList: SearchResult[], query: string): SearchResult[] {
+    if (!query || commandList.length === 0) {
+      return commandList
+    }
+
+    // 使用统一的 search 函数
+    const result = search(query, commandList)
+    return result.bestMatches
   }
 
   // ==================== 历史记录相关 ====================
@@ -604,6 +737,13 @@ export const useCommandDataStore = defineStore('commandData', () => {
   function getRecentCommands(limit?: number): Command[] {
     // 同步历史记录数据，确保使用最新的路径和图标
     const syncedHistory = history.value.map((historyItem) => {
+      // 检查是否是特殊指令
+      const specialConfig = specialCommands[historyItem.path]
+      if (specialConfig) {
+        // 使用特殊指令配置覆盖历史记录中的数据
+        return { ...historyItem, ...specialConfig } as Command
+      }
+
       // 尝试从当前列表中找到
       const currentCommand = commands.value.find(
         (app) =>
@@ -739,7 +879,9 @@ export const useCommandDataStore = defineStore('commandData', () => {
     // 指令和搜索相关
     loadCommands,
     search,
+    searchInCommands,
     searchImageCommands,
+    searchTextCommands,
     searchFileCommands,
     reloadUserData,
 

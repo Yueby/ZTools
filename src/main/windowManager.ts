@@ -10,8 +10,9 @@ import {
   Tray
 } from 'electron'
 import path from 'path'
-import trayIconLight from '../../resources/trayTemplate@2x-light.png?asset'
-import trayIcon from '../../resources/trayTemplate@2x.png?asset'
+import trayIconLight from '../../resources/icons/trayTemplate@2x-light.png?asset'
+import trayIcon from '../../resources/icons/trayTemplate@2x.png?asset'
+import databaseAPI from './api/shared/database'
 import clipboardManager from './clipboardManager'
 import pluginManager from './pluginManager'
 
@@ -33,12 +34,44 @@ class WindowManager {
   } | null = null // 打开应用前激活的窗口
   private shouldHideOnBlur = true // 是否在失去焦点时隐藏窗口
   // private _shouldRestoreFocus = true // TODO: 是否在隐藏窗口时恢复焦点（待实现）
+  private windowPositionsByDisplay: Record<number, { x: number; y: number }> = {} // 各显示器的窗口位置缓存
+
+  /**
+   * 获取鼠标所在显示器的工作区尺寸和位置
+   */
+  private getDisplayAtCursor(): {
+    width: number
+    height: number
+    x: number
+    y: number
+    id: number
+  } {
+    // 获取鼠标当前位置
+    const cursorPoint = screen.getCursorScreenPoint()
+    // 获取鼠标所在的显示器
+    const display = screen.getDisplayNearestPoint(cursorPoint)
+    return {
+      ...display.workArea,
+      id: display.id
+    }
+  }
+
+  /**
+   * 获取当前显示器 ID（基于窗口位置）
+   */
+  public getCurrentDisplayId(): number | null {
+    if (!this.mainWindow) return null
+    const [x, y] = this.mainWindow.getPosition()
+    const display = screen.getDisplayNearestPoint({ x, y })
+    return display.id
+  }
 
   /**
    * 创建主窗口
    */
   public createWindow(): BrowserWindow {
-    const { width, height } = screen.getPrimaryDisplay().workAreaSize
+    // 智能检测：在鼠标所在的显示器上打开窗口
+    const { width, height, x: displayX, y: displayY } = this.getDisplayAtCursor()
 
     // 根据平台设置不同的窗口配置
     const windowConfig: Electron.BrowserWindowConstructorOptions = {
@@ -47,10 +80,11 @@ class WindowManager {
       width: 800,
       minWidth: 800,
       height: 59,
-      x: Math.floor((width - 800) / 2),
-      y: Math.floor((height - 500) / 3),
+      x: displayX + Math.floor((width - 800) / 2),
+      y: displayY + Math.floor((height - 500) / 2.5), // 稍微偏上一点的居中位置
       frame: false, // 无边框
       resizable: true,
+      maximizable: false, // 禁用最大化
       skipTaskbar: true,
       show: false,
       webPreferences: {
@@ -300,8 +334,79 @@ class WindowManager {
         this.mainWindow.webContents.send('window-info-changed', currentWindow)
       }
 
+      // 智能定位：将窗口移动到鼠标所在的显示器（同步，从内存读取）
+      this.moveWindowToCursor()
+      // 直接显示窗口，位置已同步设置完成
       this.mainWindow.show()
     }
+  }
+
+  /**
+   * 加载各显示器的窗口位置数据到内存（初始化时调用）
+   */
+  public async loadWindowPositions(): Promise<void> {
+    try {
+      const savedPositions = (await databaseAPI.dbGet('window-positions-by-display')) || {}
+      this.windowPositionsByDisplay = savedPositions
+      console.log('已加载窗口位置数据:', Object.keys(savedPositions).length, '个显示器')
+    } catch (error) {
+      console.error('加载窗口位置数据失败:', error)
+      this.windowPositionsByDisplay = {}
+    }
+  }
+
+  /**
+   * 保存窗口位置到指定显示器（供 window.ts 调用）
+   */
+  public async saveWindowPosition(displayId: number, x: number, y: number): Promise<void> {
+    // 更新内存中的数据
+    this.windowPositionsByDisplay[displayId] = { x, y }
+
+    // 异步保存到数据库，不阻塞
+    try {
+      await databaseAPI.dbPut('window-positions-by-display', this.windowPositionsByDisplay)
+    } catch (error) {
+      console.error('保存窗口位置失败:', error)
+    }
+  }
+
+  /**
+   * 将窗口移动到鼠标所在的显示器
+   * 优先恢复该显示器上次保存的位置，如果没有则居中显示
+   */
+  private moveWindowToCursor(): void {
+    if (!this.mainWindow) return
+
+    const { width, height, x: displayX, y: displayY, id: displayId } = this.getDisplayAtCursor()
+
+    // 从内存中获取该显示器保存的位置（无需等待数据库）
+    const savedPosition = this.windowPositionsByDisplay[displayId]
+
+    let x: number, y: number
+
+    if (
+      savedPosition &&
+      typeof savedPosition.x === 'number' &&
+      typeof savedPosition.y === 'number'
+    ) {
+      // 使用保存的位置
+      x = savedPosition.x
+      y = savedPosition.y
+      console.log(`恢复显示器 ${displayId} 的窗口位置:`, { x, y })
+    } else {
+      // 获取窗口当前的实际宽度（保持用户调整后的宽度）
+      const [windowWidth] = this.mainWindow.getSize()
+      // 计算窗口在显示器上的居中位置
+      x = displayX + Math.floor((width - windowWidth) / 2)
+      y = displayY + Math.floor((height - 500) / 2.5) // 稍微偏上一点的居中位置
+      console.log(`显示器 ${displayId} 首次打开，居中显示:`, {
+        display: { x: displayX, y: displayY, width, height },
+        windowSize: windowWidth,
+        windowPos: { x, y }
+      })
+    }
+
+    this.mainWindow.setPosition(x, y, false) // 只设置位置，不改变尺寸
   }
 
   /**
@@ -320,6 +425,9 @@ class WindowManager {
       this.mainWindow.webContents.send('window-info-changed', currentWindow)
     }
 
+    // 智能定位：将窗口移动到鼠标所在的显示器（同步，从内存读取）
+    this.moveWindowToCursor()
+    // 直接显示窗口，位置已同步设置完成
     this.mainWindow.show()
     this.mainWindow.webContents.focus()
   }
@@ -441,11 +549,11 @@ class WindowManager {
     // 通知渲染进程显示设置页面
     this.mainWindow.webContents.send('show-settings')
 
-    // 显示窗口
-    setTimeout(() => {
-      this.mainWindow?.show()
-      this.mainWindow?.webContents.focus()
-    }, 50)
+    // 智能定位：将窗口移动到鼠标所在的显示器（同步，从内存读取）
+    this.moveWindowToCursor()
+    // 直接显示窗口，位置已同步设置完成
+    this.mainWindow.show()
+    this.mainWindow.webContents.focus()
   }
 }
 

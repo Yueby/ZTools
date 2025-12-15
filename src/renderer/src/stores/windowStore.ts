@@ -15,11 +15,14 @@ interface PluginInfo {
   subInputPlaceholder?: string
 }
 
-const DEFAULT_PLACEHOLDER = '搜索应用或输入命令'
-const DEFAULT_AVATAR = defaultAvatar
+export const DEFAULT_PLACEHOLDER = '搜索应用和指令 / 粘贴文件或图片'
+export const DEFAULT_AVATAR = defaultAvatar
 
 // 自动粘贴选项
 export type AutoPasteOption = 'off' | '1s' | '3s' | '5s' | '10s'
+
+// 自动清空选项
+export type AutoClearOption = 'immediately' | '1m' | '2m' | '3m' | '5m' | '10m' | 'never'
 
 // 更新下载状态
 interface UpdateDownloadInfo {
@@ -44,6 +47,9 @@ export const useWindowStore = defineStore('window', () => {
 
   // 自动粘贴配置
   const autoPaste = ref<AutoPasteOption>('off')
+
+  // 自动清空配置
+  const autoClear = ref<AutoClearOption>('immediately')
 
   // 失去焦点隐藏配置
   const hideOnBlur = ref(true)
@@ -108,6 +114,11 @@ export const useWindowStore = defineStore('window', () => {
   // 更新自动粘贴配置
   function updateAutoPaste(value: AutoPasteOption): void {
     autoPaste.value = value
+  }
+
+  // 更新自动清空配置
+  function updateAutoClear(value: AutoClearOption): void {
+    autoClear.value = value
   }
 
   // 更新失去焦点隐藏配置
@@ -291,6 +302,54 @@ export const useWindowStore = defineStore('window', () => {
     }
   }
 
+  // 获取自动清空的时间限制（毫秒）
+  function getAutoClearTimeLimit(): number {
+    switch (autoClear.value) {
+      case 'immediately':
+        return 0 // 立即清空
+      case '1m':
+        return 60000 // 1分钟
+      case '2m':
+        return 120000 // 2分钟
+      case '3m':
+        return 180000 // 3分钟
+      case '5m':
+        return 300000 // 5分钟
+      case '10m':
+        return 600000 // 10分钟
+      case 'never':
+        return -1 // 从不清空
+      default:
+        return 0
+    }
+  }
+
+  // 记录最后一次窗口显示的时间（用于判断是否需要清空）
+  const lastShowTime = ref<number>(Date.now())
+
+  // 检查是否应该清空搜索框（并更新时间）
+  function shouldClearSearch(): boolean {
+    const timeLimit = getAutoClearTimeLimit()
+    const now = Date.now()
+    const elapsedTime = now - lastShowTime.value
+
+    // 更新时间为当前时间
+    lastShowTime.value = now
+
+    // 从不清空
+    if (timeLimit === -1) {
+      return false
+    }
+
+    // 立即清空
+    if (timeLimit === 0) {
+      return true
+    }
+
+    // 根据时间判断（窗口隐藏了多久）
+    return elapsedTime >= timeLimit
+  }
+
   // 更新下载状态
   function setUpdateDownloadInfo(info: UpdateDownloadInfo): void {
     updateDownloadInfo.value = info
@@ -326,6 +385,9 @@ export const useWindowStore = defineStore('window', () => {
         }
         if (data.autoPaste) {
           autoPaste.value = data.autoPaste
+        }
+        if (data.autoClear) {
+          autoClear.value = data.autoClear
         }
         if (data.hideOnBlur !== undefined) {
           hideOnBlur.value = data.hideOnBlur
@@ -365,6 +427,7 @@ export const useWindowStore = defineStore('window', () => {
     currentPlugin,
     subInputPlaceholder,
     autoPaste,
+    autoClear,
     hideOnBlur,
     theme,
     primaryColor,
@@ -377,11 +440,14 @@ export const useWindowStore = defineStore('window', () => {
     updateCurrentPlugin,
     updateSubInputPlaceholder,
     updateAutoPaste,
+    updateAutoClear,
     updateHideOnBlur,
     updateTheme,
     updatePrimaryColor,
     updateCustomColor,
     getAutoPasteTimeLimit,
+    getAutoClearTimeLimit,
+    shouldClearSearch,
     setUpdateDownloadInfo,
     checkDownloadedUpdate,
     loadSettings

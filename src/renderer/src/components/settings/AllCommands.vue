@@ -189,22 +189,23 @@
                 :class="['command-tag', `tag-${cmd.type}`]"
               >
                 <template v-if="cmd.type === 'regex'">
-                  <code class="tag-code">{{ cmd.match.match }}</code>
+                  <span class="tag-badge">{{ cmd.match.match }}</span>
                   <span class="tag-badge">正则</span>
                 </template>
                 <template v-else-if="cmd.type === 'over'">
-                  <span class="tag-text"
+                  <span class="tag-badge">{{ cmd.name }}</span>
+                  <span v-if="cmd.match" class="tag-badge"
                     >长度 {{ cmd.match.minLength || 1 }}-{{ cmd.match.maxLength || 10000 }}</span
                   >
                   <span class="tag-badge">任意</span>
                 </template>
                 <template v-else-if="cmd.type === 'img'">
-                  <span class="tag-text">{{ cmd.name }}</span>
+                  <span class="tag-badge">{{ cmd.name }}</span>
                   <span class="tag-badge">图片</span>
                 </template>
                 <template v-else-if="cmd.type === 'files'">
-                  <span class="tag-text">{{ cmd.name }}</span>
-                  <span v-if="cmd.match.extensions" class="tag-info"
+                  <span class="tag-badge">{{ cmd.name }}</span>
+                  <span v-if="cmd.match.extensions" class="tag-badge"
                     >{{ cmd.match.extensions.slice(0, 3).join(', ')
                     }}{{ cmd.match.extensions.length > 3 ? '...' : '' }}</span
                   >
@@ -213,11 +214,11 @@
                   }}</span>
                 </template>
                 <template v-else-if="cmd.type === 'window'">
-                  <span class="tag-text">{{ cmd.name }}</span>
+                  <span class="tag-badge">{{ cmd.name }}</span>
                   <span class="tag-badge">窗口</span>
                 </template>
                 <template v-else>
-                  <span class="tag-text">{{ cmd.name }}</span>
+                  <span class="tag-badge">{{ cmd.name }}</span>
                   <span class="tag-badge">{{ cmd.type }}</span>
                 </template>
               </span>
@@ -233,7 +234,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useCommandDataStore } from '../../stores/commandDataStore'
 
-const appDataStore = useCommandDataStore()
+const commandDataStore = useCommandDataStore()
 
 interface Source {
   type?: string
@@ -251,8 +252,8 @@ const activeTab = ref<'text' | 'match'>('text')
 const iconErrors = ref<Set<string>>(new Set())
 
 // 所有指令
-const allCommands = computed(() => appDataStore.commands)
-const allRegexCommands = computed(() => appDataStore.regexCommands)
+const allCommands = computed(() => commandDataStore.commands)
+const allRegexCommands = computed(() => commandDataStore.regexCommands)
 
 // 统计
 const appCount = computed(
@@ -390,30 +391,20 @@ function hasIconError(item: any): boolean {
   return iconErrors.value.has(key)
 }
 
-// 获取插件功能数量（所有唯一的 featureCode）
+// 获取插件指令数量（功能指令 + 匹配指令）
 function getPluginCommandCount(plugin: any): number {
-  const allFeatureCodes = new Set<string>()
+  // 统计功能指令数量
+  const textCommandCount = allCommands.value.filter(
+    (c) => c.type === 'plugin' && c.path === plugin.path && c.featureCode
+  ).length
 
-  // 收集功能指令的 featureCode
-  allCommands.value
-    .filter((c) => c.type === 'plugin' && c.path === plugin.path && c.featureCode)
-    .forEach((c) => {
-      if (c.featureCode) {
-        allFeatureCodes.add(c.featureCode)
-      }
-    })
+  // 统计匹配指令数量
+  const matchCommandCount = allRegexCommands.value.filter(
+    (c) => c.path === plugin.path && c.featureCode
+  ).length
 
-  // 收集匹配指令的 featureCode
-  allRegexCommands.value
-    .filter((c) => c.path === plugin.path && c.featureCode)
-    .forEach((c) => {
-      if (c.featureCode) {
-        allFeatureCodes.add(c.featureCode)
-      }
-    })
-
-  // 返回唯一功能数量（同一个 feature 不会被计数两次）
-  return allFeatureCodes.size
+  // 返回总指令数量
+  return textCommandCount + matchCommandCount
 }
 
 // 选择来源
@@ -709,11 +700,11 @@ onMounted(async () => {
   align-items: center;
   gap: 4px;
   padding: 4px 10px;
-  background: var(--primary-light-bg);
-  border: 1px solid transparent;
+  background: rgba(14, 165, 233, 0.15);
+  border: 1px solid rgba(14, 165, 233, 0.35);
   border-radius: 4px;
   font-size: 12px;
-  color: var(--primary-color);
+  color: #0ea5e9;
   font-weight: 500;
   transition: all 0.2s;
   cursor: default;
@@ -721,110 +712,51 @@ onMounted(async () => {
 }
 
 .command-tag:hover {
-  background: var(--primary-color);
+  background: #0ea5e9;
   color: white;
+  border-color: #0ea5e9;
   transform: translateY(-1px);
-  box-shadow: 0 2px 6px rgba(var(--primary-rgb), 0.25);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
 }
 
-/* 正则匹配指令 */
-.command-tag.tag-regex {
-  background: var(--warning-light-bg);
-  color: var(--warning-color);
+/* 暗色模式下的功能指令标签 */
+@media (prefers-color-scheme: dark) {
+  .command-tag {
+    background: rgba(56, 189, 248, 0.15);
+    border: 1px solid rgba(56, 189, 248, 0.3);
+    color: #7dd3fc;
+  }
+
+  .command-tag:hover {
+    background: #38bdf8;
+    color: #1f2937;
+    border-color: #38bdf8;
+  }
 }
 
-.command-tag.tag-regex:hover {
-  background: var(--warning-color);
-  color: white;
-}
-
-/* 任意文本匹配指令 */
-.command-tag.tag-over {
-  background: var(--purple-light-bg);
-  color: var(--purple-color);
-}
-
-.command-tag.tag-over:hover {
-  background: var(--purple-color);
-  color: white;
-}
-
-/* 图片匹配指令 */
-.command-tag.tag-img {
-  background: var(--success-light-bg);
-  color: var(--success-color);
-}
-
-.command-tag.tag-img:hover {
-  background: var(--success-color);
-  color: white;
-}
-
-/* 文件匹配指令 */
-.command-tag.tag-files {
-  background: rgba(59, 130, 246, 0.1);
-  color: rgb(59, 130, 246);
-}
-
-.command-tag.tag-files:hover {
-  background: rgb(59, 130, 246);
-  color: white;
-}
-
-/* 窗口匹配指令 */
-.command-tag.tag-window {
-  background: rgba(234, 179, 8, 0.1);
-  color: rgb(234, 179, 8);
-}
-
-.command-tag.tag-window:hover {
-  background: rgb(234, 179, 8);
-  color: white;
-}
-
-/* 正则表达式代码 */
-.tag-code {
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-  font-size: 11px;
+/* 统一的标签徽章 */
+.tag-badge {
   padding: 2px 6px;
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.3);
   border-radius: 3px;
+  font-size: 10px;
   font-weight: 500;
   letter-spacing: 0.3px;
 }
 
-.command-tag:hover .tag-code {
-  background: rgba(255, 255, 255, 0.3);
-}
-
-/* 文本说明 */
-.tag-text {
-  font-size: 11px;
-  opacity: 0.9;
-}
-
-/* 附加信息 */
-.tag-info {
-  font-size: 10px;
-  padding: 2px 6px;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 3px;
-  opacity: 0.8;
-}
-
-/* 类型徽章 */
-.tag-badge {
-  padding: 2px 6px;
-  background: rgba(0, 0, 0, 0.15);
-  border-radius: 3px;
-  font-size: 9px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-}
-
 .command-tag:hover .tag-badge {
-  background: rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.35);
+}
+
+/* 暗色模式下的标签徽章 */
+@media (prefers-color-scheme: dark) {
+  .tag-badge {
+    background: rgba(255, 255, 255, 0.15);
+  }
+
+  .command-tag:hover .tag-badge {
+    background: rgba(255, 255, 255, 0.25);
+  }
 }
 
 .command-icon {
