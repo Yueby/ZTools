@@ -10,8 +10,8 @@ import {
   Tray
 } from 'electron'
 import path from 'path'
-import trayIconLight from '../../resources/trayTemplate@2x-light.png?asset'
-import trayIcon from '../../resources/trayTemplate@2x.png?asset'
+import trayIconLight from '../../resources/icons/trayTemplate@2x-light.png?asset'
+import trayIcon from '../../resources/icons/trayTemplate@2x.png?asset'
 import databaseAPI from './api/shared/database'
 import clipboardManager from './clipboardManager'
 import pluginManager from './pluginManager'
