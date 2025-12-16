@@ -297,8 +297,16 @@ import { DEFAULT_PLACEHOLDER, useWindowStore } from '../../stores/windowStore'
 
 const windowStore = useWindowStore()
 
-const defaultHotkey = 'Option+Z'
-const hotkey = ref(defaultHotkey)
+// 当前平台（与 window.ztools.getPlatform 返回类型保持一致）
+const platform = ref<'darwin' | 'win32' | 'linux'>('darwin')
+
+// 默认快捷键（根据平台区分文案）
+const defaultHotkey = computed(() => {
+  return platform.value === 'win32' ? 'Alt+Z' : 'Option+Z'
+})
+
+// 实际快捷键字符串
+const hotkey = ref('')
 const isRecording = ref(false)
 const recordedKeys = ref<string[]>([])
 
@@ -382,10 +390,10 @@ function handleKeyDown(e: KeyboardEvent): void {
 
   const keys: string[] = []
 
-  // 修饰键
+  // 修饰键（根据平台区分 Alt 文案）
   if (e.metaKey) keys.push('Command')
   if (e.ctrlKey) keys.push('Ctrl')
-  if (e.altKey) keys.push('Option')
+  if (e.altKey) keys.push(platform.value === 'win32' ? 'Alt' : 'Option')
   if (e.shiftKey) keys.push('Shift')
 
   // 主键 - 使用 e.code 避免 Option 键产生特殊字符
@@ -459,9 +467,9 @@ async function handleKeyUp(e: KeyboardEvent): Promise<void> {
 // 重置快捷键
 async function resetHotkey(): Promise<void> {
   try {
-    const result = await window.ztools.updateShortcut(defaultHotkey)
+    const result = await window.ztools.updateShortcut(defaultHotkey.value)
     if (result.success) {
-      hotkey.value = defaultHotkey
+      hotkey.value = defaultHotkey.value
       await saveSettings()
       console.log('重置快捷键成功:', hotkey.value)
     } else {
@@ -658,6 +666,11 @@ async function getAppVersion(): Promise<void> {
       node: vs.node || '未知',
       chrome: vs.chrome || '未知'
     }
+    // 获取平台信息，用于快捷键文案（mac 显示 Option，Windows 显示 Alt）
+    const pf = window.ztools.getPlatform()
+    if (pf === 'darwin' || pf === 'win32' || pf === 'linux') {
+      platform.value = pf
+    }
   } catch (error) {
     console.error('获取版本失败:', error)
     appVersion.value = '未知'
@@ -703,7 +716,7 @@ async function loadSettings(): Promise<void> {
     console.log('加载到的设置:', data)
     if (data) {
       opacity.value = data.opacity ?? 1
-      hotkey.value = data.hotkey ?? defaultHotkey
+      hotkey.value = data.hotkey ?? defaultHotkey.value
       showTrayIcon.value = data.showTrayIcon ?? true
 
       // 通过 store 加载 placeholder 和 avatar
@@ -722,7 +735,7 @@ async function loadSettings(): Promise<void> {
 
     // 获取当前实际注册的快捷键
     const currentShortcut = await window.ztools.getCurrentShortcut()
-    hotkey.value = currentShortcut
+    hotkey.value = currentShortcut || defaultHotkey.value
 
     // 应用透明度设置
     await window.ztools.setWindowOpacity(opacity.value)

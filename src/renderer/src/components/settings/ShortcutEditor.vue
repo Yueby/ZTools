@@ -39,7 +39,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import DetailPanel from '../common/DetailPanel.vue'
 
 interface GlobalShortcut {
@@ -57,6 +57,9 @@ const emit = defineEmits<{
   (e: 'back'): void
   (e: 'save', shortcut: string, target: string): void
 }>()
+
+// 平台信息（用于区分 Alt/Option 显示）
+const platform = ref<'darwin' | 'win32' | 'linux'>('darwin')
 
 // 录制状态
 const isRecording = ref(false)
@@ -110,10 +113,10 @@ function handleKeyDown(e: KeyboardEvent): void {
 
   const keys: string[] = []
 
-  // 修饰键
+  // 修饰键（Alt 在 Windows 上显示为 Alt，其它平台显示为 Option）
   if (e.metaKey) keys.push('Command')
   if (e.ctrlKey) keys.push('Ctrl')
-  if (e.altKey) keys.push('Option')
+  if (e.altKey) keys.push(platform.value === 'win32' ? 'Alt' : 'Option')
   if (e.shiftKey) keys.push('Shift')
 
   // 主键
@@ -173,6 +176,14 @@ function handleSave(): void {
 // 清理
 onUnmounted(() => {
   stopRecording()
+})
+
+// 初始化平台信息
+onMounted(() => {
+  const pf = window.ztools.getPlatform()
+  if (pf === 'darwin' || pf === 'win32' || pf === 'linux') {
+    platform.value = pf
+  }
 })
 </script>
 
