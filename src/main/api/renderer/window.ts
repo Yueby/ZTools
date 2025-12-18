@@ -52,7 +52,12 @@ export class WindowAPI {
       const [width] = this.mainWindow.getSize()
       // 限制高度范围: 最小 59px, 最大 600px
       const newHeight = Math.max(59, Math.min(height, 600))
+
+      // 临时启用 resizable 以允许代码调整大小
+      this.mainWindow.setResizable(true)
       this.mainWindow.setSize(width, newHeight)
+      // 立即禁用 resizable，防止用户手动调整
+      this.mainWindow.setResizable(false)
     }
   }
 

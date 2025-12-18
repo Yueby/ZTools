@@ -404,8 +404,9 @@ onMounted(async () => {
     searchQuery.value = ''
     // 清空当前插件信息
     windowStore.updateCurrentPlugin(null)
-    // 聚焦搜索框
+    // 等待 DOM 更新后调整窗口高度并聚焦搜索框
     nextTick(() => {
+      updateWindowHeight()
       searchBoxRef.value?.focus()
     })
   })

@@ -27,17 +27,17 @@ ZTools 是一个高性能、可扩展的 macOS/Windows 应用启动器和插件�
 
 ```bash
 # 开发
-npm run dev          # 启动开发模式（热重载）
+pnpm dev          # 启动开发模式（热重载）
 
 # 类型检查
-npm run typecheck:node  # 主进程 + preload
-npm run typecheck:web   # 渲染进程
-npm run typecheck       # 全部
+pnpm typecheck:node  # 主进程 + preload
+pnpm typecheck:web   # 渲染进程
+pnpm typecheck       # 全部
 
 # 构建
-npm run build           # 仅编译源码
-npm run build:mac       # 打包 macOS 应用
-npm run build:unpack    # 打包但不生成安装包（调试用）
+pnpm build           # 仅编译源码
+pnpm build:mac       # 打包 macOS 应用
+pnpm build:unpack    # 打包但不生成安装包（调试用）
 ```
 
 ## 核心架构
@@ -1284,8 +1284,8 @@ window.exports = {
 
 ### 类型安全
 
-- 主进程和 preload 的类型检查是分开的（`npm run typecheck:node`）
-- 渲染进程类型检查（`npm run typecheck:web`）
+- 主进程和 preload 的类型检查是分开的（`pnpm typecheck:node`）
+- 渲染进程类型检查（`pnpm typecheck:web`）
 - `env.d.ts` 需要与 `preload/index.ts` 保持同步
 - **禁止使用 `any` 类型**，优先使用具体类型或泛型
 

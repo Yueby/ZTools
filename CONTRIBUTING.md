@@ -64,19 +64,19 @@ git checkout -b fix/my-bugfix
 
 ```bash
 # 安装依赖
-npm install
+pnpm install
 
 # 启动开发模式
-npm run dev
+pnpm dev
 
 # 类型检查
-npm run typecheck
+pnpm typecheck
 
 # 代码格式化
-npm run format
+pnpm format
 
 # ESLint 检查
-npm run lint
+pnpm lint
 ```
 
 ### 4. 提交

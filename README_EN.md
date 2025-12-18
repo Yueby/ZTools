@@ -54,14 +54,14 @@ git clone https://github.com/ZToolsCenter/ZTools.git
 cd ZTools
 
 # Install dependencies
-npm install
+pnpm install
 
 # Development mode
-npm run dev
+pnpm dev
 
 # Build
-npm run build:mac    # macOS
-npm run build:win    # Windows
+pnpm build:mac    # macOS
+pnpm build:win    # Windows
 ```
 
 ### Usage
@@ -251,30 +251,30 @@ ztools/
 
 ```bash
 # Install dependencies
-npm install
+pnpm install
 
 # Development mode (hot reload)
-npm run dev
+pnpm dev
 
 # Type checking
-npm run typecheck          # All
-npm run typecheck:node     # Main process + preload
-npm run typecheck:web      # Renderer process
+pnpm typecheck          # All
+pnpm typecheck:node     # Main process + preload
+pnpm typecheck:web      # Renderer process
 
 # Code formatting
-npm run format             # Prettier formatting
-npm run lint               # ESLint check
+pnpm format             # Prettier formatting
+pnpm lint               # ESLint check
 
 # Build
-npm run build              # Compile source code only
-npm run build:mac          # Package macOS app
-npm run build:win          # Package Windows app
-npm run build:unpack       # Package without installer (for debugging)
+pnpm build              # Compile source code only
+pnpm build:mac          # Package macOS app
+pnpm build:win          # Package Windows app
+pnpm build:unpack       # Package without installer (for debugging)
 ```
 
 ### Debugging
 
-- Main process: Press F5 in VS Code, or use `npm run dev` to view terminal logs
+- Main process: Press F5 in VS Code, or use `pnpm dev` to view terminal logs
 - Renderer process: Press `Cmd+Option+I` (macOS) or `Ctrl+Shift+I` (Windows) to open developer tools
 - Plugins: Click "Open DevTools" button on the plugin page
 

@@ -74,12 +74,11 @@ class WindowManager {
       type: 'panel',
       title: 'ZTools',
       width: 800,
-      minWidth: 800,
       height: 59,
       x: displayX + Math.floor((width - 800) / 2),
-      y: displayY + Math.floor((height - 500) / 2.5), // 稍微偏上一点的居中位置
+      y: displayY + Math.floor((height - 500) / 2.4), // 垂直居中偏上的位置
       frame: false, // 无边框
-      resizable: true,
+      resizable: false, // 禁止用户手动调整窗口大小
       maximizable: false, // 禁用最大化
       skipTaskbar: true,
       show: false,
@@ -405,7 +404,7 @@ class WindowManager {
       // 计算默认居中位置（稍微偏上）
       const [windowWidth] = this.mainWindow.getSize()
       x = displayX + Math.floor((width - windowWidth) / 2)
-      y = displayY + Math.floor((height - 500) / 2.5)
+      y = displayY + Math.floor((height - 500) / 2.4)
     }
 
     this.mainWindow.setPosition(x, y, false)

@@ -26,7 +26,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, toValue, type MaybeRefOrGetter } from 'vue'
 import type { Command } from '../../stores/commandDataStore'
 import AppList from '../search/AppList.vue'
 
@@ -36,7 +36,7 @@ interface Props {
   selectedIndex?: number // 选中索引
   emptyText?: string // 空状态文本
   draggable?: boolean // 是否支持拖拽
-  expanded?: boolean // 是否展开（v-model）
+  expanded?: MaybeRefOrGetter<boolean> // 是否展开（v-model）
   itemsPerRow?: number // 每行显示数量
   defaultVisibleRows?: number // 默认显示的行数（折叠时）
 }
@@ -69,7 +69,7 @@ const canExpand = computed(() => {
 
 // 是否展开
 const isExpanded = computed({
-  get: () => props.expanded,
+  get: () => toValue(props.expanded),
   set: (value) => emit('update:expanded', value)
 })
 

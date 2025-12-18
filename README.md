@@ -54,14 +54,14 @@ git clone https://github.com/ZToolsCenter/ZTools.git
 cd ZTools
 
 # 安装依赖
-npm install
+pnpm install
 
 # 开发模式
-npm run dev
+pnpm dev
 
 # 构建
-npm run build:mac    # macOS
-npm run build:win    # Windows
+pnpm build:mac    # macOS
+pnpm build:win    # Windows
 ```
 
 ### 使用
@@ -251,30 +251,30 @@ ztools/
 
 ```bash
 # 安装依赖
-npm install
+pnpm install
 
 # 开发模式（热重载）
-npm run dev
+pnpm dev
 
 # 类型检查
-npm run typecheck          # 全部
-npm run typecheck:node     # 主进程 + preload
-npm run typecheck:web      # 渲染进程
+pnpm typecheck          # 全部
+pnpm typecheck:node     # 主进程 + preload
+pnpm typecheck:web      # 渲染进程
 
 # 代码格式化
-npm run format             # Prettier 格式化
-npm run lint               # ESLint 检查
+pnpm format             # Prettier 格式化
+pnpm lint               # ESLint 检查
 
 # 构建
-npm run build              # 仅编译源码
-npm run build:mac          # 打包 macOS 应用
-npm run build:win          # 打包 Windows 应用
-npm run build:unpack       # 打包但不生成安装包（调试用）
+pnpm build              # 仅编译源码
+pnpm build:mac          # 打包 macOS 应用
+pnpm build:win          # 打包 Windows 应用
+pnpm build:unpack       # 打包但不生成安装包（调试用）
 ```
 
 ### 调试
 
-- 主进程：在 VS Code 中按 F5，或使用 `npm run dev` 查看终端日志
+- 主进程：在 VS Code 中按 F5，或使用 `pnpm dev` 查看终端日志
 - 渲染进程：在应用中按 `Cmd+Option+I`（macOS）或 `Ctrl+Shift+I`（Windows）打开开发者工具
 - 插件：在插件页面点击"打开开发者工具"按钮
 

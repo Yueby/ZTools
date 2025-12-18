@@ -1,0 +1,6 @@
+ignoredBuiltDependencies:
+  - electron
+  - esbuild
+  - extract-file-icon
+  - lmdb
+  - msgpackr-extract
