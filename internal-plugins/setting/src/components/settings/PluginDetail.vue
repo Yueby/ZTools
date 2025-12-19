@@ -310,7 +310,7 @@ async function loadReadme(): Promise<void> {
   readmeError.value = ''
 
   try {
-    const result = await window.ztools.getPluginReadme(props.plugin.path)
+    const result = await window.ztools.internal.getPluginReadme(props.plugin.path)
     if (result.success && result.content) {
       readmeContent.value = result.content
     } else {
@@ -335,7 +335,7 @@ async function loadPluginData(): Promise<void> {
   dataError.value = ''
 
   try {
-    const result = await window.ztools.getPluginDocKeys(props.plugin.name)
+    const result = await window.ztools.internal.getPluginDocKeys(props.plugin.name)
     if (result.success) {
       docKeys.value = result.data || []
     } else {
@@ -410,7 +410,7 @@ async function toggleDataDetail(item: DocItem): Promise<void> {
   currentDocType.value = item.type
 
   try {
-    const result = await window.ztools.getPluginDoc(props.plugin.name, item.key)
+    const result = await window.ztools.internal.getPluginDoc(props.plugin.name, item.key)
     if (result.success) {
       currentDocContent.value = result.data
       currentDocType.value = result.type || 'document'

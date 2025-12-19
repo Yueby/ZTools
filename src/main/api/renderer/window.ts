@@ -24,6 +24,7 @@ export class WindowAPI {
     ipcMain.handle('set-tray-icon-visible', (_event, visible: boolean) =>
       this.setTrayIconVisible(visible)
     )
+    ipcMain.on('open-settings', () => this.openSettings())
   }
 
   private setupWindowEvents(): void {
@@ -86,6 +87,11 @@ export class WindowAPI {
   private setTrayIconVisible(visible: boolean): void {
     windowManager.setTrayIconVisible(visible)
     console.log('设置托盘图标可见性:', visible)
+  }
+
+  private openSettings(): void {
+    windowManager.showSettings()
+    console.log('打开设置插件')
   }
 }
 

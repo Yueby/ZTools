@@ -1,0 +1,20 @@
+{
+  "$schema": "node_modules/@ztools-center/ztools-api-types/resource/ztools.schema.json",
+  "name": "setting",
+  "description": "ZTools 内置设置插件",
+  "author": "Zing",
+  "version": "1.0.0",
+  "main": "index.html",
+  "logo": "logo.png",
+  "development": {
+    "main": "http://localhost:5177"
+  },
+  "features": [
+    {
+      "code": "settings",
+      "explain": "应用设置",
+      "icon": "logo.png",
+      "cmds": ["设置", "Settings", "偏好设置", "Preferences"]
+    }
+  ]
+}

@@ -183,11 +183,8 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { useCommandDataStore } from '../../stores/commandDataStore'
 import Icon from '../common/Icon.vue'
 import PluginDetail from './PluginDetail.vue'
-
-const commandDataStore = useCommandDataStore()
 
 // 插件相关状态
 const plugins = ref<any[]>([])
@@ -207,9 +204,9 @@ const selectedPlugin = ref<any | null>(null)
 async function loadPlugins(): Promise<void> {
   isLoading.value = true
   try {
-    const result = await window.ztools.getPlugins()
+    const result = await window.ztools.internal.getPlugins()
     // 插件中心的插件都是已安装的，标记 installed 为 true
-    plugins.value = (result || []).map((plugin: any) => ({
+    plugins.value = result.map((plugin: any) => ({
       ...plugin,
       installed: true,
       localVersion: plugin.version
@@ -226,8 +223,8 @@ async function loadPlugins(): Promise<void> {
 // 加载运行中的插件
 async function loadRunningPlugins(): Promise<void> {
   try {
-    const result = await window.ztools.getRunningPlugins()
-    runningPlugins.value = result || []
+    const result = await window.ztools.internal.getRunningPlugins()
+    runningPlugins.value = result
   } catch (error) {
     console.error('加载运行中插件失败:', error)
   }
@@ -244,7 +241,7 @@ async function importPlugin(): Promise<void> {
 
   isImporting.value = true
   try {
-    const result = await window.ztools.importPlugin()
+    const result = await window.ztools.internal.importPlugin()
     if (result.success) {
       // 重新加载插件列表
       await loadPlugins()
@@ -266,7 +263,7 @@ async function importDevPlugin(): Promise<void> {
 
   isImportingDev.value = true
   try {
-    const result = await window.ztools.importDevPlugin()
+    const result = await window.ztools.internal.importDevPlugin()
     if (result.success) {
       // 重新加载插件列表
       await loadPlugins()
@@ -293,7 +290,7 @@ async function handleDeletePlugin(plugin: any): Promise<void> {
 
   isDeleting.value = true
   try {
-    const result = await window.ztools.deletePlugin(plugin.path)
+    const result = await window.ztools.internal.deletePlugin(plugin.path)
     if (result.success) {
       // 重新加载插件列表
       await loadPlugins()
@@ -314,7 +311,7 @@ async function handleKillPlugin(plugin: any): Promise<void> {
 
   isKilling.value = true
   try {
-    const result = await window.ztools.killPlugin(plugin.path)
+    const result = await window.ztools.internal.killPlugin(plugin.path)
     if (result.success) {
       // 重新加载运行状态
       await loadRunningPlugins()
@@ -332,7 +329,7 @@ async function handleKillPlugin(plugin: any): Promise<void> {
 // 打开插件
 async function handleOpenPlugin(plugin: any): Promise<void> {
   try {
-    const result = await window.ztools.launch({
+    const result = await window.ztools.internal.launch({
       path: plugin.path,
       type: 'plugin',
       name: plugin.name, // 传递插件名称
@@ -352,7 +349,7 @@ async function handleOpenPlugin(plugin: any): Promise<void> {
 // 打开插件目录
 async function handleOpenFolder(plugin: any): Promise<void> {
   try {
-    await window.ztools.revealInFinder(plugin.path)
+    await window.ztools.internal.revealInFinder(plugin.path)
   } catch (error: any) {
     console.error('打开目录失败:', error)
     alert(`打开目录失败: ${error.message || '未知错误'}`)
@@ -365,12 +362,11 @@ async function handleReloadPlugin(plugin: any): Promise<void> {
 
   isReloading.value = true
   try {
-    const result = await window.ztools.reloadPlugin(plugin.path)
+    const result = await window.ztools.internal.reloadPlugin(plugin.path)
     if (result.success) {
       // 重新加载插件列表
       await loadPlugins()
-      // 刷新搜索数据（重新加载指令列表）
-      await commandDataStore.loadCommands()
+      // 注意：插件重载后，主程序会自动刷新指令列表
       alert('插件重载成功!')
     } else {
       alert(`插件重载失败: ${result.error}`)

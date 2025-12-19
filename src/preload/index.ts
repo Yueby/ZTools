@@ -55,6 +55,7 @@ const api = {
     ipcRenderer.invoke('kill-plugin-and-return', pluginPath),
   sendInputEvent: (event: any) => ipcRenderer.invoke('send-input-event', event),
   selectAvatar: () => ipcRenderer.invoke('select-avatar'),
+  openSettings: () => ipcRenderer.send('open-settings'),
   // 历史记录管理
   removeFromHistory: (appPath: string, featureCode?: string) =>
     ipcRenderer.invoke('remove-from-history', appPath, featureCode),
@@ -107,6 +108,23 @@ const api = {
   },
   onPinnedChanged: (callback: () => void) => {
     ipcRenderer.on('pinned-changed', callback)
+  },
+  onUpdatePlaceholder: (callback: (placeholder: string) => void) => {
+    ipcRenderer.on('update-placeholder', (_event, placeholder) => callback(placeholder))
+  },
+  onUpdateAvatar: (callback: (avatar: string) => void) => {
+    ipcRenderer.on('update-avatar', (_event, avatar) => callback(avatar))
+  },
+  onUpdateAutoPaste: (callback: (autoPaste: string) => void) => {
+    ipcRenderer.on('update-auto-paste', (_event, autoPaste) => callback(autoPaste))
+  },
+  onUpdateAutoClear: (callback: (autoClear: string) => void) => {
+    ipcRenderer.on('update-auto-clear', (_event, autoClear) => callback(autoClear))
+  },
+  onUpdatePrimaryColor: (
+    callback: (data: { primaryColor: string; customColor?: string }) => void
+  ) => {
+    ipcRenderer.on('update-primary-color', (_event, data) => callback(data))
   },
   onIpcLaunch: (
     callback: (options: {

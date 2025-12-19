@@ -3,6 +3,7 @@ import { app, dialog, ipcMain } from 'electron'
 import { promises as fs } from 'fs'
 import path from 'path'
 import { normalizeIconPath } from '../../common/iconUtils'
+import { isInternalPlugin } from '../../core/internalPlugins'
 import lmdbInstance from '../../core/lmdb/lmdbInstance'
 import { sleep } from '../../utils/common.js'
 import { downloadFile } from '../../utils/download.js'
@@ -379,6 +380,15 @@ export class PluginsAPI {
       }
 
       const pluginInfo = plugins[pluginIndex]
+
+      // ✅ 检查是否为内置插件
+      if (isInternalPlugin(pluginInfo.name)) {
+        return {
+          success: false,
+          error: '内置插件不能卸载'
+        }
+      }
+
       plugins.splice(pluginIndex, 1)
       await databaseAPI.dbPut('plugins', plugins)
 

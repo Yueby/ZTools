@@ -1,0 +1,69 @@
+import { app } from 'electron'
+import fsSync from 'fs'
+import path from 'path'
+import api from '../api/index'
+import { INTERNAL_PLUGIN_NAMES, getInternalPluginPath } from './internalPlugins'
+
+/**
+ * 加载所有内置插件
+ * 在应用启动时调用，自动将内置插件添加到数据库
+ */
+export async function loadInternalPlugins(): Promise<void> {
+  console.log('开始加载内置插件...')
+
+  const isDev = !app.isPackaged
+  const existingPlugins = (await api.dbGet('plugins')) || []
+
+  // 移除旧的内置插件记录（基于名称判断）
+  const filteredPlugins = existingPlugins.filter(
+    (p: any) => !INTERNAL_PLUGIN_NAMES.includes(p.name)
+  )
+
+  // 重新加载所有内置插件
+  for (const pluginName of INTERNAL_PLUGIN_NAMES) {
+    try {
+      const pluginPath = getInternalPluginPath(pluginName)
+
+      // 开发模式：插件路径直接指向 public 目录
+      // 生产模式：插件路径指向插件根目录（打包时已将 dist 构建产物复制到此目录）
+      const effectivePluginPath = isDev ? path.join(pluginPath, 'public') : pluginPath
+
+      // 读取 plugin.json
+      const pluginJsonPath = path.join(effectivePluginPath, 'plugin.json')
+
+      if (!fsSync.existsSync(pluginJsonPath)) {
+        console.error(`内置插件 ${pluginName} 的 plugin.json 不存在:`, pluginJsonPath)
+        continue
+      }
+
+      const pluginConfig = JSON.parse(fsSync.readFileSync(pluginJsonPath, 'utf-8'))
+
+      // 构建插件信息
+      const logoPath = pluginConfig.logo ? path.join(effectivePluginPath, pluginConfig.logo) : ''
+      const mainPath = pluginConfig.main
+        ? path.join(effectivePluginPath, pluginConfig.main)
+        : undefined
+
+      const pluginInfo = {
+        name: pluginConfig.name,
+        version: pluginConfig.version,
+        description: pluginConfig.description || '',
+        logo: logoPath ? `file:///${logoPath}` : '',
+        path: effectivePluginPath, // 保存有效路径（开发模式下是 public 目录）
+        features: pluginConfig.features || [],
+        isDevelopment: isDev,
+        main: mainPath
+      }
+      console.log('加载插件', pluginInfo)
+
+      filteredPlugins.push(pluginInfo)
+      console.log(`✓ 已加载内置插件: ${pluginName}`)
+    } catch (error) {
+      console.error(`加载内置插件 ${pluginName} 失败:`, error)
+    }
+  }
+
+  // 保存到数据库
+  await api.dbPut('plugins', filteredPlugins)
+  console.log('内置插件加载完成')
+}

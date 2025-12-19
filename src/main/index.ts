@@ -5,13 +5,14 @@ import path from 'path'
 import api from './api/index'
 import appWatcher from './appWatcher'
 import detachedWindowManager from './core/detachedWindowManager'
+import { loadInternalPlugins } from './core/internalPluginLoader'
 import pluginManager from './pluginManager'
 import windowManager from './windowManager'
 
 // 配置 electron-log
 log.transports.file.level = 'debug'
 log.transports.file.maxSize = 5 * 1024 * 1024 // 5MB
-log.transports.file.resolvePath = () => {
+log.transports.file.resolvePathFn = () => {
   return path.join(app.getPath('userData'), 'logs/main.log')
 }
 log.transports.console.level = 'debug'
@@ -36,6 +37,9 @@ export function getCurrentShortcut(): string {
 }
 
 app.whenReady().then(async () => {
+  // ✅ 首先加载内置插件
+  await loadInternalPlugins()
+
   // 隐藏 Dock 图标（仅在没有分离窗口时隐藏）
   if (platform.isMacOS) {
     if (!detachedWindowManager.hasDetachedWindows()) {

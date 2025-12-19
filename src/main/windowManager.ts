@@ -12,6 +12,7 @@ import {
 import path from 'path'
 import trayIconLight from '../../resources/icons/trayTemplate@2x-light.png?asset'
 import trayIcon from '../../resources/icons/trayTemplate@2x.png?asset'
+import api from './api/index.js'
 import clipboardManager from './clipboardManager'
 import pluginManager from './pluginManager'
 
@@ -526,7 +527,7 @@ class WindowManager {
   /**
    * 显示设置页面
    */
-  public showSettings(): void {
+  public async showSettings(): Promise<void> {
     if (!this.mainWindow) return
 
     // 如果当前有插件在显示，先隐藏插件
@@ -547,14 +548,43 @@ class WindowManager {
       this.mainWindow.webContents.send('window-info-changed', currentWindow)
     }
 
-    // 通知渲染进程显示设置页面
-    this.mainWindow.webContents.send('show-settings')
+    // 从数据库查找设置插件
+    try {
+      const plugins: any = await api.dbGet('plugins')
+      if (!plugins || !Array.isArray(plugins)) {
+        console.error('未找到插件列表')
+        return
+      }
 
-    // 智能定位：将窗口移动到鼠标所在的显示器（同步，从内存读取）
-    this.moveWindowToCursor()
-    // 直接显示窗口，位置已同步设置完成
-    this.mainWindow.show()
-    this.mainWindow.webContents.focus()
+      const settingPlugin = plugins.find((p: any) => p.name === 'setting')
+      if (!settingPlugin) {
+        console.error('未找到设置插件')
+        return
+      }
+
+      console.log('找到设置插件:', settingPlugin.path)
+
+      // 使用统一的 launch 方法启动设置插件
+      const result = await api.launchPlugin({
+        path: settingPlugin.path,
+        type: 'plugin',
+        featureCode: 'main',
+        name: '设置'
+      })
+
+      if (!result.success) {
+        console.error('启动设置插件失败:', result.error)
+        return
+      }
+
+      // 智能定位：将窗口移动到鼠标所在的显示器（同步，从内存读取）
+      this.moveWindowToCursor()
+      // 直接显示窗口，位置已同步设置完成
+      this.mainWindow.show()
+      this.mainWindow.webContents.focus()
+    } catch (error) {
+      console.error('打开设置插件失败:', error)
+    }
   }
 }
 

@@ -20,6 +20,7 @@ import pluginDialogAPI from './plugin/dialog'
 import { pluginFeatureAPI } from './plugin/feature'
 import pluginHttpAPI from './plugin/http'
 import pluginInputAPI from './plugin/input'
+import internalPluginAPI from './plugin/internal'
 import pluginLifecycleAPI from './plugin/lifecycle'
 import pluginRedirectAPI from './plugin/redirect'
 import pluginScreenAPI from './plugin/screen'
@@ -49,7 +50,7 @@ class APIManager {
     appsAPI.init(mainWindow, pluginManager)
     pluginsAPI.init(mainWindow, pluginManager)
     windowAPI.init(mainWindow)
-    settingsAPI.init(mainWindow)
+    settingsAPI.init(mainWindow, pluginManager)
     systemAPI.init(mainWindow)
     systemSettingsAPI.init()
 
@@ -66,6 +67,9 @@ class APIManager {
     pluginRedirectAPI.init(mainWindow)
     pluginFeatureAPI.init(pluginManager)
     pluginHttpAPI.init(pluginManager)
+
+    // 初始化内置插件专用API
+    internalPluginAPI.init(mainWindow, pluginManager)
 
     // 初始化软件更新API
     updaterAPI.init(mainWindow)
@@ -148,6 +152,20 @@ class APIManager {
 
   public async dbGet(key: string): Promise<any> {
     return await databaseAPI.dbGet(key)
+  }
+
+  /**
+   * 启动插件（供其他模块使用）
+   */
+  public async launchPlugin(options: {
+    path: string
+    type?: 'direct' | 'plugin'
+    featureCode?: string
+    param?: any
+    name?: string
+    cmdType?: string
+  }): Promise<any> {
+    return await appsAPI.launch(options)
   }
 
   /**

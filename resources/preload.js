@@ -13,6 +13,7 @@ const clipboardChangeCallbacks = []
 const subInputChangeCallbacks = []
 const pluginOutCallbacks = []
 const mainPushCallbacks = []
+const hotkeyRecordedCallbacks = []
 
 // 获取操作系统类型
 const osType = electron.ipcRenderer.sendSync('get-os-type')
@@ -306,6 +307,106 @@ window.ztools = {
     getHeaders: () => electron.ipcRenderer.sendSync('http-get-headers'),
     // 清除请求头配置
     clearHeaders: () => electron.ipcRenderer.sendSync('http-clear-headers')
+  },
+
+  // 内置插件专用 API（仅限内置插件调用）
+  internal: {
+    // ==================== 数据库 API (ZTOOLS/ 命名空间) ====================
+    dbPut: async (key, value) => await electron.ipcRenderer.invoke('internal:db-put', key, value),
+    dbGet: async (key) => await electron.ipcRenderer.invoke('internal:db-get', key),
+
+    // ==================== 应用启动 API ====================
+    launch: async (params) => await electron.ipcRenderer.invoke('internal:launch', params),
+
+    // ==================== 指令管理 API ====================
+    getCommands: async () => await electron.ipcRenderer.invoke('internal:get-commands'),
+
+    // ==================== 插件管理 API ====================
+    getPlugins: async () => await electron.ipcRenderer.invoke('internal:get-plugins'),
+    importPlugin: async () => await electron.ipcRenderer.invoke('internal:import-plugin'),
+    importDevPlugin: async (pluginPath) =>
+      await electron.ipcRenderer.invoke('internal:import-dev-plugin', pluginPath),
+    deletePlugin: async (pluginPath) =>
+      await electron.ipcRenderer.invoke('internal:delete-plugin', pluginPath),
+    reloadPlugin: async (pluginPath) =>
+      await electron.ipcRenderer.invoke('internal:reload-plugin', pluginPath),
+    getRunningPlugins: async () =>
+      await electron.ipcRenderer.invoke('internal:get-running-plugins'),
+    killPlugin: async (pluginPath) =>
+      await electron.ipcRenderer.invoke('internal:kill-plugin', pluginPath),
+    fetchPluginMarket: async () =>
+      await electron.ipcRenderer.invoke('internal:fetch-plugin-market'),
+    installPluginFromMarket: async (plugin) =>
+      await electron.ipcRenderer.invoke('internal:install-plugin-from-market', plugin),
+    getPluginReadme: async (pluginPath) =>
+      await electron.ipcRenderer.invoke('internal:get-plugin-readme', pluginPath),
+    getPluginDocKeys: async (pluginPath) =>
+      await electron.ipcRenderer.invoke('internal:get-plugin-doc-keys', pluginPath),
+    getPluginDoc: async (pluginPath, docKey) =>
+      await electron.ipcRenderer.invoke('internal:get-plugin-doc', pluginPath, docKey),
+    getPluginDataStats: async () =>
+      await electron.ipcRenderer.invoke('internal:get-plugin-data-stats'),
+    clearPluginData: async (pluginName) =>
+      await electron.ipcRenderer.invoke('internal:clear-plugin-data', pluginName),
+
+    // ==================== 全局快捷键 API ====================
+    registerGlobalShortcut: async (shortcut, target) =>
+      await electron.ipcRenderer.invoke('internal:register-global-shortcut', shortcut, target),
+    unregisterGlobalShortcut: async (shortcut) =>
+      await electron.ipcRenderer.invoke('internal:unregister-global-shortcut', shortcut),
+    startHotkeyRecording: async () =>
+      await electron.ipcRenderer.invoke('internal:start-hotkey-recording'),
+    updateShortcut: async (shortcut) =>
+      await electron.ipcRenderer.invoke('internal:update-shortcut', shortcut),
+    getCurrentShortcut: async () =>
+      await electron.ipcRenderer.invoke('get-current-shortcut'),
+    onHotkeyRecorded: (callback) => {
+      if (callback && typeof callback === 'function') {
+        hotkeyRecordedCallbacks.push(callback)
+      }
+    },
+
+    // ==================== 系统设置 API ====================
+    setWindowOpacity: async (opacity) =>
+      await electron.ipcRenderer.invoke('internal:set-window-opacity', opacity),
+    selectAvatar: async () => await electron.ipcRenderer.invoke('internal:select-avatar'),
+    setTheme: async (theme) => await electron.ipcRenderer.invoke('internal:set-theme', theme),
+    setTrayIconVisible: async (visible) =>
+      await electron.ipcRenderer.invoke('internal:set-tray-icon-visible', visible),
+    setLaunchAtLogin: async (enabled) =>
+      await electron.ipcRenderer.invoke('internal:set-launch-at-login', enabled),
+    getLaunchAtLogin: async () =>
+      await electron.ipcRenderer.invoke('internal:get-launch-at-login'),
+    getAppVersion: async () => await electron.ipcRenderer.invoke('get-app-version'),
+    getSystemVersions: async () =>
+      await electron.ipcRenderer.invoke('get-system-versions'),
+    getPlatform: () => electron.ipcRenderer.sendSync('internal:get-platform'),
+
+    // 通知主渲染进程更新搜索框提示文字
+    updatePlaceholder: async (placeholder) =>
+      await electron.ipcRenderer.invoke('internal:update-placeholder', placeholder),
+    // 通知主渲染进程更新头像
+    updateAvatar: async (avatar) =>
+      await electron.ipcRenderer.invoke('internal:update-avatar', avatar),
+    // 通知主渲染进程更新自动粘贴配置
+    updateAutoPaste: async (autoPaste) =>
+      await electron.ipcRenderer.invoke('internal:update-auto-paste', autoPaste),
+    // 通知主渲染进程更新自动清空配置
+    updateAutoClear: async (autoClear) =>
+      await electron.ipcRenderer.invoke('internal:update-auto-clear', autoClear),
+    // 通知主渲染进程更新主题色
+    updatePrimaryColor: async (primaryColor, customColor) =>
+      await electron.ipcRenderer.invoke('internal:update-primary-color', primaryColor, customColor),
+
+    // ==================== 应用更新 API ====================
+    updaterCheckUpdate: async () =>
+      await electron.ipcRenderer.invoke('internal:updater-check-update'),
+    updaterStartUpdate: async (updateInfo) =>
+      await electron.ipcRenderer.invoke('internal:updater-start-update', updateInfo),
+
+    // ==================== 其他 API ====================
+    revealInFinder: async (path) =>
+      await electron.ipcRenderer.invoke('internal:reveal-in-finder', path)
   }
 }
 
@@ -335,6 +436,12 @@ electron.ipcRenderer.on('sub-input-change', (event, details) => {
 electron.ipcRenderer.on('main-push', (event, data) => {
   console.log('收到主进程推送:', data)
   mainPushCallbacks.forEach((cb) => cb(data))
+})
+
+// 监听快捷键录制事件
+electron.ipcRenderer.on('hotkey-recorded', (event, shortcut) => {
+  console.log('收到快捷键录制事件:', shortcut)
+  hotkeyRecordedCallbacks.forEach((cb) => cb(shortcut))
 })
 
 // 监听主进程的插件方法调用请求（用于无界面插件）

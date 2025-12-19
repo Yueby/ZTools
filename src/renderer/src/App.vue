@@ -10,7 +10,6 @@
           v-model:pasted-text="pastedTextData"
           :current-view="currentView"
           @composing="handleComposing"
-          @settings-click="handleSettingsClick"
           @arrow-keydown="handleArrowKeydown"
         />
       </div>
@@ -32,9 +31,6 @@
       <div v-if="currentView === ViewMode.Plugin" class="plugin-placeholder">
         <!-- 插件内容由 BrowserView 渲染，这里只是占位 -->
       </div>
-
-      <!-- 配置组件 -->
-      <Settings v-if="currentView === ViewMode.Settings" @close="currentView = ViewMode.Search" />
     </div>
   </div>
 </template>
@@ -43,7 +39,6 @@
 import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import SearchBox from './components/search/SearchBox.vue'
 import SearchResults from './components/search/SearchResults.vue'
-import Settings from './components/settings/Settings.vue'
 import { useCommandDataStore } from './stores/commandDataStore'
 import { useWindowStore } from './stores/windowStore'
 
@@ -56,7 +51,6 @@ interface FileItem {
 
 enum ViewMode {
   Search = 'search',
-  Settings = 'settings',
   Plugin = 'plugin'
 }
 
@@ -150,17 +144,6 @@ function handleComposing(composing: boolean): void {
   isComposing.value = composing
 }
 
-// 处理设置按钮点击
-function handleSettingsClick(): void {
-  console.log('收到设置点击事件，当前视图:', currentView.value)
-  if (currentView.value === ViewMode.Settings) {
-    currentView.value = ViewMode.Search
-  } else {
-    currentView.value = ViewMode.Settings
-  }
-  console.log('切换后视图:', currentView.value)
-}
-
 // 将浏览器 KeyboardEvent 转换为 Electron KeyboardInputEvent 格式
 function convertToElectronKeyboardEvent(
   direction: 'left' | 'right' | 'up' | 'down',
@@ -226,18 +209,10 @@ async function detachCurrentPlugin(): Promise<void> {
   }
 }
 
-// 监听显示设置页面的变化,调整窗口高度
-watch(currentView, (newView, oldView) => {
+// 监听视图变化，调整窗口高度
+watch(currentView, (newView) => {
   if (newView === ViewMode.Plugin) {
     return
-  }
-
-  // 从设置页面返回搜索页面时，聚焦输入框
-  if (oldView === ViewMode.Settings && newView === ViewMode.Search) {
-    nextTick(() => {
-      searchBoxRef.value?.focus()
-      searchResultsRef.value?.resetSelection()
-    })
   }
 
   updateWindowHeight()
@@ -264,13 +239,6 @@ function handleKeydown(event: KeyboardEvent): void {
   // Escape 键特殊处理
   if (event.key === 'Escape') {
     event.preventDefault()
-
-    // 根据当前视图模式处理
-    if (currentView.value === ViewMode.Settings) {
-      // 设置页面 -> 返回搜索
-      currentView.value = ViewMode.Search
-      return
-    }
 
     if (currentView.value === ViewMode.Plugin) {
       // 插件页面 ESC 键处理 - 分步清除
@@ -464,13 +432,38 @@ onMounted(async () => {
     pastedTextData.value = null
   })
 
-  // 监听显示设置页面事件
-  window.ztools.onShowSettings(() => {
-    console.log('显示设置页面')
-    currentView.value = ViewMode.Settings
-    searchQuery.value = ''
-    // 调整窗口高度
-    updateWindowHeight()
+  // 监听搜索框提示文字更新事件
+  window.ztools.onUpdatePlaceholder((placeholder: string) => {
+    console.log('更新搜索框提示文字:', placeholder)
+    windowStore.updatePlaceholder(placeholder)
+  })
+
+  // 监听头像更新事件
+  window.ztools.onUpdateAvatar((avatar: string) => {
+    console.log('更新头像:', avatar)
+    windowStore.updateAvatar(avatar)
+  })
+
+  // 监听自动粘贴配置更新事件
+  window.ztools.onUpdateAutoPaste((autoPaste: string) => {
+    console.log('更新自动粘贴配置:', autoPaste)
+    windowStore.updateAutoPaste(autoPaste as any)
+  })
+
+  // 监听自动清空配置更新事件
+  window.ztools.onUpdateAutoClear((autoClear: string) => {
+    console.log('更新自动清空配置:', autoClear)
+    windowStore.updateAutoClear(autoClear as any)
+  })
+
+  // 监听主题色更新事件
+  window.ztools.onUpdatePrimaryColor((data: { primaryColor: string; customColor?: string }) => {
+    console.log('更新主题色:', data)
+    // 更新 store（会自动处理 DOM class 和 CSS 变量）
+    windowStore.updatePrimaryColor(data.primaryColor as any)
+    if (data.customColor) {
+      windowStore.updateCustomColor(data.customColor)
+    }
   })
 
   // 监听应用启动事件（应用启动后）

@@ -70,7 +70,7 @@ const activeMenu = ref('general')
 <style scoped>
 .settings-container {
   display: flex;
-  height: 500px; /* 固定高度 */
+  height: 100%; /* 固定高度 */
   background: var(--bg-color);
   border-top: 1px solid var(--divider-color);
   -webkit-app-region: no-drag; /* 禁止拖动窗口 */

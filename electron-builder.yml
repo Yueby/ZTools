@@ -13,6 +13,7 @@ files:
   - '!ztools-api-types/**'
   - '!ztools-plugin-cli/**'
   - '!scripts/**'
+  - '!internal-plugins/**'
 asarUnpack:
   - resources/**
 win:

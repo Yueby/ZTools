@@ -172,6 +172,55 @@ module.exports = async function (context) {
     console.error('复制升级程序失败:', err)
   }
 
+  // 复制内置插件
+  console.log('\n开始复制内置插件...')
+  const internalPluginsDir = path.resolve(__dirname, '../internal-plugins')
+  const pluginNames = ['setting'] // 内置插件列表
+
+  try {
+    let resourcesPath = ''
+    if (context.electronPlatformName === 'darwin') {
+      const appName = context.packager.appInfo.productFilename
+      const appPath = path.join(context.appOutDir, `${appName}.app`)
+      resourcesPath = path.join(appPath, 'Contents', 'Resources')
+    } else {
+      resourcesPath = path.join(context.appOutDir, 'resources')
+    }
+
+    const destInternalPluginsDir = path.join(resourcesPath, 'internal-plugins')
+
+    for (const pluginName of pluginNames) {
+      console.log(`\n正在复制插件: ${pluginName}`)
+      const pluginSrcDir = path.join(internalPluginsDir, pluginName)
+      const pluginDestDir = path.join(destInternalPluginsDir, pluginName)
+
+      // 确保目标目录存在
+      await fs.ensureDir(pluginDestDir)
+
+      // 复制 dist 目录（构建产物，包含 plugin.json, logo, preload 等）
+      const distSrc = path.join(pluginSrcDir, 'dist')
+      if (await fs.pathExists(distSrc)) {
+        const files = await fs.readdir(distSrc)
+        for (const file of files) {
+          const src = path.join(distSrc, file)
+          const dest = path.join(pluginDestDir, file)
+          await fs.copy(src, dest)
+        }
+        console.log(`  已复制 dist/ 目录内容到: ${pluginDestDir}`)
+      } else {
+        console.error(`  ⚠️  未找到 dist 目录: ${distSrc}`)
+        console.error(`  请先运行: pnpm build:setting`)
+      }
+
+      console.log(`  ✅ 插件 ${pluginName} 复制完成`)
+    }
+
+    console.log('\n内置插件复制完成!')
+  } catch (err) {
+    console.error('复制内置插件失败:', err)
+    throw err // 抛出错误，阻止打包继续
+  }
+
   console.log('\n国际化文件清理完成!')
 
   // 打包更新文件

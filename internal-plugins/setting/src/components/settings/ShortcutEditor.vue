@@ -180,7 +180,7 @@ onUnmounted(() => {
 
 // 初始化平台信息
 onMounted(() => {
-  const pf = window.ztools.getPlatform()
+  const pf = window.ztools.internal.getPlatform()
   if (pf === 'darwin' || pf === 'win32' || pf === 'linux') {
     platform.value = pf
   }

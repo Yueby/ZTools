@@ -140,7 +140,7 @@ const formattedDocContent = computed(() => {
 // 加载插件数据统计
 async function loadPluginData(): Promise<void> {
   try {
-    const result = await window.ztools.getPluginDataStats()
+    const result = await window.ztools.internal.getPluginDataStats()
     if (result.success) {
       pluginDataList.value = result.data || []
     }
@@ -158,7 +158,7 @@ async function viewPluginDocs(pluginName: string): Promise<void> {
   currentLevel.value = 'docList'
 
   try {
-    const result = await window.ztools.getPluginDocKeys(pluginName)
+    const result = await window.ztools.internal.getPluginDocKeys(pluginName)
     if (result.success) {
       docKeys.value = result.data || []
     }
@@ -174,7 +174,7 @@ async function viewDocContent(key: string): Promise<void> {
   currentLevel.value = 'docDetail'
 
   try {
-    const result = await window.ztools.getPluginDoc(currentPluginName.value, key)
+    const result = await window.ztools.internal.getPluginDoc(currentPluginName.value, key)
     if (result.success) {
       currentDocContent.value = result.data
       currentDocType.value = result.type || 'document'
@@ -215,7 +215,7 @@ async function handleClearData(): Promise<void> {
   }
 
   try {
-    const result = await window.ztools.clearPluginData(currentPluginName.value)
+    const result = await window.ztools.internal.clearPluginData(currentPluginName.value)
     if (result.success) {
       alert(`已成功清空 ${result.deletedCount} 个文档`)
       // 关闭弹窗

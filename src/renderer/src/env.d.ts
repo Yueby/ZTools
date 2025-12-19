@@ -187,6 +187,15 @@ declare global {
       onUpdateSubInputPlaceholder?: (
         callback: (data: { pluginPath: string; placeholder: string }) => void
       ) => void
+      // 设置插件通知主渲染进程的事件
+      openSettings: () => void
+      onUpdatePlaceholder: (callback: (placeholder: string) => void) => void
+      onUpdateAvatar: (callback: (avatar: string) => void) => void
+      onUpdateAutoPaste: (callback: (autoPaste: string) => void) => void
+      onUpdateAutoClear: (callback: (autoClear: string) => void) => void
+      onUpdatePrimaryColor: (
+        callback: (data: { primaryColor: string; customColor?: string }) => void
+      ) => void
       // 软件更新
       updater: {
         checkUpdate: () => Promise<{

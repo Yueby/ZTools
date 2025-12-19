@@ -147,11 +147,11 @@ async function fetchPlugins(): Promise<void> {
   isLoading.value = true
   try {
     // 获取当前平台（同步调用）
-    const currentPlatform = window.ztools.getPlatform()
+    const currentPlatform = window.ztools.internal.getPlatform()
     // 并行获取市场列表和已安装插件列表
     const [marketResult, installedPlugins] = await Promise.all([
-      window.ztools.fetchPluginMarket(),
-      window.ztools.getPlugins()
+      window.ztools.internal.fetchPluginMarket(),
+      window.ztools.internal.getPlugins()
     ])
 
     if (marketResult.success && marketResult.data) {
@@ -202,7 +202,7 @@ async function handleOpenPlugin(plugin: Plugin): Promise<void> {
     return
   }
   try {
-    const result = await window.ztools.launch({
+    const result = await window.ztools.internal.launch({
       path: plugin.path,
       type: 'plugin',
       name: plugin.name, // 传递插件名称
@@ -256,14 +256,14 @@ async function handleUpgradePlugin(plugin: Plugin): Promise<void> {
   try {
     // 1. 卸载旧版本
     console.log('开始卸载旧版本:', plugin.name)
-    const deleteResult = await window.ztools.deletePlugin(plugin.path)
+    const deleteResult = await window.ztools.internal.deletePlugin(plugin.path)
     if (!deleteResult.success) {
       throw new Error(`卸载失败: ${deleteResult.error}`)
     }
 
     // 2. 安装新版本
     console.log('开始安装新版本:', plugin.name)
-    const installResult = await window.ztools.installPluginFromMarket(
+    const installResult = await window.ztools.internal.installPluginFromMarket(
       JSON.parse(JSON.stringify(plugin))
     )
     if (installResult.success) {
@@ -295,7 +295,9 @@ async function downloadPlugin(plugin: Plugin): Promise<void> {
 
   installingPlugin.value = plugin.name
   try {
-    const result = await window.ztools.installPluginFromMarket(JSON.parse(JSON.stringify(plugin)))
+    const result = await window.ztools.internal.installPluginFromMarket(
+      JSON.parse(JSON.stringify(plugin))
+    )
     if (result.success) {
       console.log('插件安装成功:', plugin.name)
       // 更新状态，使用后端返回的插件信息

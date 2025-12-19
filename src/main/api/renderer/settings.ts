@@ -9,9 +9,11 @@ import databaseAPI from '../shared/database'
  */
 export class SettingsAPI {
   private mainWindow: Electron.BrowserWindow | null = null
+  private pluginManager: any = null
 
-  public init(mainWindow: Electron.BrowserWindow): void {
+  public init(mainWindow: Electron.BrowserWindow, pluginManager: any): void {
     this.mainWindow = mainWindow
+    this.pluginManager = pluginManager
     this.setupIPC()
     this.loadAndApplySettings()
   }
@@ -213,10 +215,17 @@ export class SettingsAPI {
       for (const shortcut of commonShortcuts) {
         try {
           const success = globalShortcut.register(shortcut, () => {
-            // 快捷键被触发，发送到渲染进程
+            // 快捷键被触发，发送到设置插件
             console.log(`临时快捷键触发: ${shortcut}`)
-            if (this.mainWindow) {
-              this.mainWindow.webContents.send('hotkey-recorded', shortcut)
+
+            // 获取设置插件的 webContents 并发送事件
+            if (this.pluginManager) {
+              const settingWebContents = this.pluginManager.getPluginWebContentsByName('setting')
+              if (settingWebContents) {
+                settingWebContents.send('hotkey-recorded', shortcut)
+              } else {
+                console.warn('设置插件未找到，无法发送快捷键录制事件')
+              }
             }
 
             // 立即注销所有临时快捷键（只能触发一次）

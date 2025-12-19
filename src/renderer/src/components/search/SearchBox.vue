@@ -681,9 +681,9 @@ async function handleSettingsClick(): Promise<void> {
 
     await window.ztools.showContextMenu(menuItems)
   } else {
-    // 否则打开设置页面
-    console.log('触发设置点击事件')
-    emit('settings-click')
+    // 否则打开设置插件
+    console.log('打开设置插件')
+    window.ztools.openSettings()
   }
 }
 

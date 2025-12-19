@@ -51,6 +51,7 @@ export class AppsAPI {
 
   private setupIPC(): void {
     ipcMain.handle('get-apps', () => this.getApps())
+    ipcMain.handle('get-commands', () => this.getCommands())
     ipcMain.handle('launch', (_event, options: any) => this.launch(options))
     ipcMain.handle('refresh-apps-cache', () => this.refreshAppsCache())
 
@@ -214,7 +215,7 @@ export class AppsAPI {
   /**
    * 启动应用或插件（统一接口）
    */
-  private async launch(options: {
+  public async launch(options: {
     path: string
     type?: 'direct' | 'plugin'
     featureCode?: string
@@ -696,6 +697,82 @@ export class AppsAPI {
    */
   private restoreLastMatch(): LastMatchState | null {
     return this.lastMatchState
+  }
+
+  /**
+   * 获取所有指令（供 AllCommands 页面使用）
+   * 返回处理后的 commands 和 regexCommands
+   */
+  private async getCommands(): Promise<{ commands: any[]; regexCommands: any[] }> {
+    try {
+      const rawApps = await this.getApps()
+
+      // 获取插件列表 - 直接从数据库获取
+      const pluginsData = await databaseAPI.dbGet('plugins')
+      const plugins = pluginsData || []
+
+      const commands: any[] = []
+      const regexCommands: any[] = []
+
+      // 处理应用指令
+      for (const app of rawApps) {
+        commands.push({
+          name: app.name,
+          path: app.path,
+          icon: app.icon,
+          type: 'direct',
+          subType: 'app'
+        })
+      }
+
+      // 处理插件指令
+      for (const plugin of plugins) {
+        if (!plugin.features || !Array.isArray(plugin.features)) {
+          continue
+        }
+
+        for (const feature of plugin.features) {
+          if (!feature.cmds || !Array.isArray(feature.cmds)) {
+            continue
+          }
+
+          for (const cmd of feature.cmds) {
+            if (typeof cmd === 'string') {
+              // 功能指令
+              commands.push({
+                name: cmd,
+                path: plugin.path,
+                icon: feature.icon || plugin.logo,
+                type: 'plugin',
+                featureCode: feature.code,
+                pluginExplain: feature.explain,
+                cmdType: 'text'
+              })
+            } else if (typeof cmd === 'object') {
+              // 匹配指令
+              regexCommands.push({
+                name: cmd.label || feature.explain || '',
+                path: plugin.path,
+                icon: feature.icon || plugin.logo,
+                type: 'plugin',
+                featureCode: feature.code,
+                pluginExplain: feature.explain,
+                cmdType: cmd.type,
+                matchCmd: {
+                  type: cmd.type,
+                  match: cmd.match || cmd.regex || ''
+                }
+              })
+            }
+          }
+        }
+      }
+
+      return { commands, regexCommands }
+    } catch (error) {
+      console.error('获取指令列表失败:', error)
+      return { commands: [], regexCommands: [] }
+    }
   }
 }
 

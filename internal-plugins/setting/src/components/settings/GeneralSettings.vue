@@ -62,7 +62,7 @@
         <span class="setting-desc">选择应用的主题外观</span>
       </div>
       <div class="setting-control">
-        <select v-model="windowStore.theme" class="select" @change="handleThemeChange">
+        <select v-model="theme" class="select" @change="handleThemeChange">
           <option value="system">跟随系统</option>
           <option value="light">明亮</option>
           <option value="dark">暗黑</option>
@@ -81,23 +81,19 @@
           v-for="color in themeColors"
           :key="color.value"
           class="color-option"
-          :class="{ active: windowStore.primaryColor === color.value }"
+          :class="{ active: primaryColor === color.value }"
           :style="{ backgroundColor: color.hex }"
           :title="color.label"
           @click="handlePrimaryColorChange(color.value)"
         ></div>
         <div
           class="color-option custom-color-option"
-          :class="{ active: windowStore.primaryColor === 'custom' }"
+          :class="{ active: primaryColor === 'custom' }"
           :style="{ backgroundColor: customColor }"
           title="自定义"
           @click="handleSelectCustomColor"
         ></div>
-        <button
-          v-if="windowStore.primaryColor === 'custom'"
-          class="btn btn-sm"
-          @click="openColorPicker"
-        >
+        <button v-if="primaryColor === 'custom'" class="btn btn-sm" @click="openColorPicker">
           自定义
         </button>
         <input
@@ -118,7 +114,7 @@
       </div>
       <div class="setting-control">
         <input
-          v-model="windowStore.placeholder"
+          v-model="placeholder"
           type="text"
           class="input"
           placeholder="输入提示文字"
@@ -126,7 +122,7 @@
           @keyup.enter="handlePlaceholderChange"
         />
         <button
-          v-if="windowStore.placeholder !== defaultPlaceholder"
+          v-if="placeholder !== defaultPlaceholder"
           class="btn btn-icon"
           title="重置"
           @click="handleResetPlaceholder"
@@ -158,15 +154,15 @@
       </div>
       <div class="setting-control avatar-control">
         <img
-          v-if="windowStore.avatar"
-          :src="windowStore.avatar"
-          :class="['avatar-preview', { 'default-avatar': windowStore.avatar === defaultAvatar }]"
+          v-if="avatar"
+          :src="avatar"
+          :class="['avatar-preview', { 'default-avatar': avatar === defaultAvatar }]"
           alt="头像预览"
           draggable="false"
         />
         <button class="btn" @click="handleSelectAvatar">选择图片</button>
         <button
-          v-if="windowStore.avatar !== defaultAvatar"
+          v-if="avatar !== defaultAvatar"
           class="btn btn-icon"
           title="重置"
           @click="handleResetAvatar"
@@ -197,7 +193,7 @@
         <span class="setting-desc">复制文本后在设定时间内打开窗口自动粘贴</span>
       </div>
       <div class="setting-control">
-        <select v-model="windowStore.autoPaste" class="select" @change="handleAutoPasteChange">
+        <select v-model="autoPaste" class="select" @change="handleAutoPasteChange">
           <option value="off">关闭</option>
           <option value="1s">1秒内</option>
           <option value="3s">3秒内</option>
@@ -214,7 +210,7 @@
         <span class="setting-desc">窗口显示状态切换后自动清空搜索框内容的时间</span>
       </div>
       <div class="setting-control">
-        <select v-model="windowStore.autoClear" class="select" @change="handleAutoClearChange">
+        <select v-model="autoClear" class="select" @change="handleAutoClearChange">
           <option value="immediately">立即</option>
           <option value="1m">1分钟</option>
           <option value="2m">2分钟</option>
@@ -276,9 +272,14 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { DEFAULT_PLACEHOLDER, DEFAULT_AVATAR, useWindowStore } from '../../stores/windowStore'
-
-const windowStore = useWindowStore()
+import {
+  DEFAULT_PLACEHOLDER,
+  DEFAULT_AVATAR,
+  type AutoPasteOption,
+  type AutoClearOption,
+  type ThemeType,
+  type PrimaryColor
+} from '../../constants'
 
 // 当前平台（与 window.ztools.getPlatform 返回类型保持一致）
 const platform = ref<'darwin' | 'win32' | 'linux'>('darwin')
@@ -287,6 +288,14 @@ const platform = ref<'darwin' | 'win32' | 'linux'>('darwin')
 const defaultHotkey = computed(() => {
   return platform.value === 'win32' ? 'Alt+Z' : 'Option+Z'
 })
+
+// 本地状态（替代 windowStore）
+const theme = ref<ThemeType>('system')
+const primaryColor = ref<PrimaryColor>('blue')
+const placeholder = ref(DEFAULT_PLACEHOLDER)
+const avatar = ref(DEFAULT_AVATAR)
+const autoPaste = ref<AutoPasteOption>('off')
+const autoClear = ref<AutoClearOption>('immediately')
 
 // 实际快捷键字符串
 const hotkey = ref('')
@@ -322,10 +331,10 @@ const themeColors = [
 // 自定义颜色
 const customColor = ref('#db2777')
 
-// 头像默认值（从 windowStore 导入，确保与搜索框判断逻辑一致）
+// 头像默认值
 const defaultAvatar = DEFAULT_AVATAR
 
-// 搜索框提示文字默认值（从 windowStore 导入）
+// 搜索框提示文字默认值
 const defaultPlaceholder = DEFAULT_PLACEHOLDER
 
 // 显示的快捷键文本
@@ -343,7 +352,7 @@ async function startRecording(): Promise<void> {
 
   // 请求后端注册临时快捷键监听
   try {
-    const result = await window.ztools.startHotkeyRecording()
+    const result = await window.ztools.internal.startHotkeyRecording()
     if (result.success) {
       console.log('已启动后端快捷键监听')
     } else {
@@ -429,7 +438,7 @@ async function handleKeyUp(e: KeyboardEvent): Promise<void> {
 
     try {
       // 调用 IPC 更新全局快捷键
-      const result = await window.ztools.updateShortcut(newHotkey)
+      const result = await window.ztools.internal.updateShortcut(newHotkey)
       if (result.success) {
         hotkey.value = newHotkey
         // 保存到数据库
@@ -450,7 +459,7 @@ async function handleKeyUp(e: KeyboardEvent): Promise<void> {
 // 重置快捷键
 async function resetHotkey(): Promise<void> {
   try {
-    const result = await window.ztools.updateShortcut(defaultHotkey.value)
+    const result = await window.ztools.internal.updateShortcut(defaultHotkey.value)
     if (result.success) {
       hotkey.value = defaultHotkey.value
       await saveSettings()
@@ -467,7 +476,7 @@ async function resetHotkey(): Promise<void> {
 // 处理不透明度变化
 async function handleOpacityChange(): Promise<void> {
   try {
-    await window.ztools.setWindowOpacity(opacity.value)
+    await window.ztools.internal.setWindowOpacity(opacity.value)
     // 保存到数据库
     await saveSettings()
   } catch (error) {
@@ -479,12 +488,14 @@ async function handleOpacityChange(): Promise<void> {
 async function handlePlaceholderChange(): Promise<void> {
   try {
     // 如果为空，恢复默认值
-    if (!windowStore.placeholder.trim()) {
-      windowStore.updatePlaceholder(defaultPlaceholder)
+    if (!placeholder.value.trim()) {
+      placeholder.value = defaultPlaceholder
     }
     // 保存到数据库
     await saveSettings()
-    console.log('搜索框提示文字已更新:', windowStore.placeholder)
+    // 通知主渲染进程更新
+    await window.ztools.internal.updatePlaceholder(placeholder.value)
+    console.log('搜索框提示文字已更新:', placeholder.value)
   } catch (error) {
     console.error('保存搜索框提示文字失败:', error)
   }
@@ -493,8 +504,10 @@ async function handlePlaceholderChange(): Promise<void> {
 // 重置搜索框提示文字
 async function handleResetPlaceholder(): Promise<void> {
   try {
-    windowStore.updatePlaceholder(defaultPlaceholder)
+    placeholder.value = defaultPlaceholder
     await saveSettings()
+    // 通知主渲染进程更新
+    await window.ztools.internal.updatePlaceholder(placeholder.value)
     console.log('搜索框提示文字已重置')
   } catch (error) {
     console.error('重置搜索框提示文字失败:', error)
@@ -504,11 +517,13 @@ async function handleResetPlaceholder(): Promise<void> {
 // 选择头像
 async function handleSelectAvatar(): Promise<void> {
   try {
-    const result = await window.ztools.selectAvatar()
+    const result = await window.ztools.internal.selectAvatar()
     if (result.success && result.path) {
-      windowStore.updateAvatar(result.path)
+      avatar.value = result.path
       await saveSettings()
-      console.log('头像已更新:', windowStore.avatar)
+      // 通知主渲染进程更新
+      await window.ztools.internal.updateAvatar(avatar.value)
+      console.log('头像已更新:', avatar.value)
     } else if (result.error) {
       console.error('选择头像失败:', result.error)
     }
@@ -520,8 +535,10 @@ async function handleSelectAvatar(): Promise<void> {
 // 重置头像
 async function handleResetAvatar(): Promise<void> {
   try {
-    windowStore.updateAvatar(defaultAvatar)
+    avatar.value = defaultAvatar
     await saveSettings()
+    // 通知主渲染进程更新
+    await window.ztools.internal.updateAvatar(avatar.value)
     console.log('头像已重置')
   } catch (error) {
     console.error('重置头像失败:', error)
@@ -532,7 +549,9 @@ async function handleResetAvatar(): Promise<void> {
 async function handleAutoPasteChange(): Promise<void> {
   try {
     await saveSettings()
-    console.log('自动粘贴配置已更新:', windowStore.autoPaste)
+    // 通知主渲染进程更新
+    await window.ztools.internal.updateAutoPaste(autoPaste.value)
+    console.log('自动粘贴配置已更新:', autoPaste.value)
   } catch (error) {
     console.error('保存自动粘贴配置失败:', error)
   }
@@ -542,7 +561,9 @@ async function handleAutoPasteChange(): Promise<void> {
 async function handleAutoClearChange(): Promise<void> {
   try {
     await saveSettings()
-    console.log('自动清空配置已更新:', windowStore.autoClear)
+    // 通知主渲染进程更新
+    await window.ztools.internal.updateAutoClear(autoClear.value)
+    console.log('自动清空配置已更新:', autoClear.value)
   } catch (error) {
     console.error('保存自动清空配置失败:', error)
   }
@@ -552,8 +573,8 @@ async function handleAutoClearChange(): Promise<void> {
 async function handleThemeChange(): Promise<void> {
   try {
     await saveSettings()
-    await window.ztools.setTheme(windowStore.theme)
-    console.log('主题配置已更新:', windowStore.theme)
+    await window.ztools.internal.setTheme(theme.value)
+    console.log('主题配置已更新:', theme.value)
   } catch (error) {
     console.error('更新主题配置失败:', error)
   }
@@ -562,8 +583,20 @@ async function handleThemeChange(): Promise<void> {
 // 处理主题色变化
 async function handlePrimaryColorChange(color: string): Promise<void> {
   try {
-    windowStore.updatePrimaryColor(color)
+    primaryColor.value = color as PrimaryColor
+
+    // 应用主题色类名到 body
+    document.body.className = document.body.className.replace(/theme-\w+/g, '').trim()
+    document.body.classList.add(`theme-${color}`)
+
+    // 如果是自定义颜色，应用自定义颜色值
+    if (color === 'custom') {
+      applyCustomColor(customColor.value)
+    }
+
     await saveSettings()
+    // 通知主渲染进程更新
+    await window.ztools.internal.updatePrimaryColor(color, customColor.value)
     console.log('主题色已更新:', color)
   } catch (error) {
     console.error('更新主题色失败:', error)
@@ -573,11 +606,19 @@ async function handlePrimaryColorChange(color: string): Promise<void> {
 // 选择自定义颜色（不打开色盘）
 async function handleSelectCustomColor(): Promise<void> {
   try {
-    windowStore.updatePrimaryColor('custom')
-    // 重新应用自定义颜色，触发智能调整
-    windowStore.updateCustomColor(customColor.value)
+    primaryColor.value = 'custom' as PrimaryColor
+
+    // 应用主题色类名到 body
+    document.body.className = document.body.className.replace(/theme-\w+/g, '').trim()
+    document.body.classList.add('theme-custom')
+
+    // 应用自定义颜色值
+    applyCustomColor(customColor.value)
+
     await saveSettings()
-    console.log('已选择自定义主题色，颜色已智能调整')
+    // 通知主渲染进程更新
+    await window.ztools.internal.updatePrimaryColor('custom', customColor.value)
+    console.log('已选择自定义主题色')
   } catch (error) {
     console.error('选择自定义主题色失败:', error)
   }
@@ -594,9 +635,15 @@ async function handleCustomColorChange(event: Event): Promise<void> {
   const color = target.value
   customColor.value = color
 
+  // 如果当前主题色是自定义，立即应用
+  if (primaryColor.value === 'custom') {
+    applyCustomColor(color)
+  }
+
   try {
-    windowStore.updateCustomColor(color)
     await saveSettings()
+    // 通知主渲染进程更新
+    await window.ztools.internal.updatePrimaryColor(primaryColor.value, color)
     console.log('自定义主题色已更新:', color)
   } catch (error) {
     console.error('更新自定义主题色失败:', error)
@@ -608,7 +655,7 @@ async function handleTrayIconChange(): Promise<void> {
   try {
     await saveSettings()
     // 通知主进程更新托盘图标显示状态
-    await window.ztools.setTrayIconVisible(showTrayIcon.value)
+    await window.ztools.internal.setTrayIconVisible(showTrayIcon.value)
     console.log('托盘图标显示状态已更新:', showTrayIcon.value)
   } catch (error) {
     console.error('更新托盘图标显示状态失败:', error)
@@ -618,7 +665,7 @@ async function handleTrayIconChange(): Promise<void> {
 // 处理开机启动变化
 async function handleLaunchAtLoginChange(): Promise<void> {
   try {
-    await window.ztools.setLaunchAtLogin(launchAtLogin.value)
+    await window.ztools.internal.setLaunchAtLogin(launchAtLogin.value)
     console.log('开机启动设置已更新:', launchAtLogin.value)
   } catch (error) {
     console.error('更新开机启动设置失败:', error)
@@ -630,15 +677,15 @@ async function handleLaunchAtLoginChange(): Promise<void> {
 // 获取应用版本
 async function getAppVersion(): Promise<void> {
   try {
-    appVersion.value = await window.ztools.getAppVersion()
-    const vs = await window.ztools.getSystemVersions()
+    appVersion.value = await window.ztools.internal.getAppVersion()
+    const vs = await window.ztools.internal.getSystemVersions()
     versions.value = {
       electron: vs.electron || '未知',
       node: vs.node || '未知',
       chrome: vs.chrome || '未知'
     }
     // 获取平台信息，用于快捷键文案（mac 显示 Option，Windows 显示 Alt）
-    const pf = window.ztools.getPlatform()
+    const pf = await window.ztools.internal.getPlatform()
     if (pf === 'darwin' || pf === 'win32' || pf === 'linux') {
       platform.value = pf
     }
@@ -654,15 +701,15 @@ async function handleCheckUpdate(): Promise<void> {
   isCheckingUpdate.value = true
 
   try {
-    const result = await window.ztools.updater.checkUpdate()
+    const result = await window.ztools.internal.updaterCheckUpdate()
     if (result.hasUpdate) {
       if (
         confirm(
           `发现新版本 ${result.latestVersion}，是否立即更新？\n\n` +
-            `更新内容：\n${result.updateInfo.releaseNotes || '无'}`
+            `更新内容：\n${result.updateInfo?.releaseNotes || '无'}`
         )
       ) {
-        await window.ztools.updater.startUpdate(result.updateInfo)
+        await window.ztools.internal.updaterStartUpdate(result.updateInfo)
       }
     } else {
       if (result.error) {
@@ -679,40 +726,188 @@ async function handleCheckUpdate(): Promise<void> {
   }
 }
 
+// ==================== 自定义颜色相关辅助函数 ====================
+
+// 应用自定义颜色
+function applyCustomColor(color: string): void {
+  // 智能调整颜色
+  const adjustedColor = adjustColorForTheme(color)
+
+  // 如果颜色被调整了，输出日志
+  if (adjustedColor !== color) {
+    console.log('颜色已智能调整:', color, '→', adjustedColor)
+  }
+
+  // 动态设置 CSS 变量
+  document.documentElement.style.setProperty('--primary-color', adjustedColor)
+}
+
+// 智能调整颜色以适应当前主题
+function adjustColorForTheme(color: string): string {
+  // 检测当前是否为暗色主题
+  const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches
+
+  // 将颜色转换为 RGB
+  const rgb = hexToRgb(color)
+  if (!rgb) return color
+
+  // 计算相对亮度（使用 W3C 公式）
+  const luminance = (0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b) / 255
+
+  // 亮色主题：如果颜色太亮（接近白色），调整为较深颜色
+  if (!isDarkMode && luminance > 0.9) {
+    return adjustBrightness(color, 0.4) // 降低亮度到 40%
+  }
+
+  // 暗色主题：如果颜色太暗（接近黑色），调整为较亮颜色
+  if (isDarkMode && luminance < 0.15) {
+    return adjustBrightness(color, 0.6) // 提高亮度到 60%
+  }
+
+  return color
+}
+
+// 将 hex 颜色转换为 RGB
+function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
+  return result
+    ? {
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16)
+      }
+    : null
+}
+
+// 调整颜色亮度
+function adjustBrightness(hex: string, targetLuminance: number): string {
+  const rgb = hexToRgb(hex)
+  if (!rgb) return hex
+
+  // 转换为 HSL
+  const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b)
+
+  // 调整亮度
+  hsl.l = targetLuminance
+
+  // 转换回 RGB
+  const adjustedRgb = hslToRgb(hsl.h, hsl.s, hsl.l)
+
+  // 转换为 hex
+  return rgbToHex(adjustedRgb.r, adjustedRgb.g, adjustedRgb.b)
+}
+
+// RGB 转 HSL
+function rgbToHsl(r: number, g: number, b: number): { h: number; s: number; l: number } {
+  r /= 255
+  g /= 255
+  b /= 255
+
+  const max = Math.max(r, g, b)
+  const min = Math.min(r, g, b)
+  let h = 0
+  let s = 0
+  const l = (max + min) / 2
+
+  if (max !== min) {
+    const d = max - min
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
+
+    switch (max) {
+      case r:
+        h = ((g - b) / d + (g < b ? 6 : 0)) / 6
+        break
+      case g:
+        h = ((b - r) / d + 2) / 6
+        break
+      case b:
+        h = ((r - g) / d + 4) / 6
+        break
+    }
+  }
+
+  return { h, s, l }
+}
+
+// HSL 转 RGB
+function hslToRgb(h: number, s: number, l: number): { r: number; g: number; b: number } {
+  let r: number, g: number, b: number
+
+  if (s === 0) {
+    r = g = b = l // achromatic
+  } else {
+    const hue2rgb = (p: number, q: number, t: number): number => {
+      if (t < 0) t += 1
+      if (t > 1) t -= 1
+      if (t < 1 / 6) return p + (q - p) * 6 * t
+      if (t < 1 / 2) return q
+      if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6
+      return p
+    }
+
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s
+    const p = 2 * l - q
+
+    r = hue2rgb(p, q, h + 1 / 3)
+    g = hue2rgb(p, q, h)
+    b = hue2rgb(p, q, h - 1 / 3)
+  }
+
+  return {
+    r: Math.round(r * 255),
+    g: Math.round(g * 255),
+    b: Math.round(b * 255)
+  }
+}
+
+// RGB 转 Hex
+function rgbToHex(r: number, g: number, b: number): string {
+  return '#' + [r, g, b].map((x) => x.toString(16).padStart(2, '0')).join('')
+}
+
+// ==================== 数据持久化 ====================
+
 // 加载设置
 async function loadSettings(): Promise<void> {
   try {
     // 加载数据库中的设置
-    const data = await window.ztools.dbGet('settings-general')
+    const data = await window.ztools.internal.dbGet('settings-general')
     console.log('加载到的设置:', data)
     if (data) {
       opacity.value = data.opacity ?? 1
       hotkey.value = data.hotkey ?? defaultHotkey.value
       showTrayIcon.value = data.showTrayIcon ?? true
-
-      // 通过 store 加载 placeholder 和 avatar
-      if (data.placeholder) {
-        windowStore.updatePlaceholder(data.placeholder)
-      }
-      if (data.avatar) {
-        windowStore.updateAvatar(data.avatar)
-      }
+      placeholder.value = data.placeholder ?? DEFAULT_PLACEHOLDER
+      avatar.value = data.avatar ?? DEFAULT_AVATAR
+      autoPaste.value = data.autoPaste ?? 'off'
+      autoClear.value = data.autoClear ?? 'immediately'
+      theme.value = data.theme ?? 'system'
+      primaryColor.value = data.primaryColor ?? 'blue'
 
       // 加载自定义颜色
       if (data.customColor) {
         customColor.value = data.customColor
       }
+
+      // 应用主题色类名到 body
+      document.body.className = document.body.className.replace(/theme-\w+/g, '').trim()
+      document.body.classList.add(`theme-${primaryColor.value}`)
+
+      // 如果是自定义颜色，应用自定义颜色值
+      if (primaryColor.value === 'custom') {
+        applyCustomColor(customColor.value)
+      }
     }
 
     // 获取当前实际注册的快捷键
-    const currentShortcut = await window.ztools.getCurrentShortcut()
+    const currentShortcut = await window.ztools.internal.getCurrentShortcut()
     hotkey.value = currentShortcut || defaultHotkey.value
 
     // 应用透明度设置
-    await window.ztools.setWindowOpacity(opacity.value)
+    await window.ztools.internal.setWindowOpacity(opacity.value)
 
     // 获取开机启动状态
-    launchAtLogin.value = await window.ztools.getLaunchAtLogin()
+    launchAtLogin.value = await window.ztools.internal.getLaunchAtLogin()
   } catch (error) {
     console.error('加载设置失败:', error)
   }
@@ -722,17 +917,17 @@ async function loadSettings(): Promise<void> {
 async function saveSettings(): Promise<void> {
   try {
     // 只有自定义头像才保存到数据库，默认头像不保存
-    const avatarToSave = windowStore.avatar === defaultAvatar ? undefined : windowStore.avatar
+    const avatarToSave = avatar.value === defaultAvatar ? undefined : avatar.value
 
-    await window.ztools.dbPut('settings-general', {
+    await window.ztools.internal.dbPut('settings-general', {
       opacity: opacity.value,
       hotkey: hotkey.value,
-      placeholder: windowStore.placeholder,
+      placeholder: placeholder.value,
       avatar: avatarToSave,
-      autoPaste: windowStore.autoPaste,
-      autoClear: windowStore.autoClear,
-      theme: windowStore.theme,
-      primaryColor: windowStore.primaryColor,
+      autoPaste: autoPaste.value,
+      autoClear: autoClear.value,
+      theme: theme.value,
+      primaryColor: primaryColor.value,
       customColor: customColor.value,
       showTrayIcon: showTrayIcon.value
     })
@@ -747,14 +942,16 @@ onMounted(() => {
   getAppVersion()
 
   // 监听后端发送的快捷键录制事件
-  window.ztools.onHotkeyRecorded((shortcut: string) => {
-    if (isRecording.value) {
-      console.log('收到后端快捷键录制事件:', shortcut)
-      // 直接设置快捷键，不需要等待 keyup
-      recordedKeys.value = shortcut.split('+')
-      handleHotkeyRecorded(shortcut)
-    }
-  })
+  if (window.ztools.internal.onHotkeyRecorded) {
+    window.ztools.internal.onHotkeyRecorded((shortcut: string) => {
+      if (isRecording.value) {
+        console.log('收到后端快捷键录制事件:', shortcut)
+        // 直接设置快捷键，不需要等待 keyup
+        recordedKeys.value = shortcut.split('+')
+        handleHotkeyRecorded(shortcut)
+      }
+    })
+  }
 })
 
 // 处理后端传来的快捷键（立即确认）
@@ -762,7 +959,7 @@ async function handleHotkeyRecorded(newHotkey: string): Promise<void> {
   // 后端已经自动注销了临时快捷键，直接处理设置
   try {
     // 调用 IPC 更新全局快捷键
-    const result = await window.ztools.updateShortcut(newHotkey)
+    const result = await window.ztools.internal.updateShortcut(newHotkey)
     if (result.success) {
       hotkey.value = newHotkey
       // 保存到数据库

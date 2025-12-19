@@ -111,7 +111,7 @@ const editingShortcut = ref<GlobalShortcut | null>(null) // 正在编辑的快�
 // 加载快捷键列表
 async function loadShortcuts(): Promise<void> {
   try {
-    const data = await window.ztools.dbGet('global-shortcuts')
+    const data = await window.ztools.internal.dbGet('global-shortcuts')
     shortcuts.value = data || []
     console.log('加载全局快捷键:', shortcuts.value)
   } catch (error) {
@@ -122,7 +122,10 @@ async function loadShortcuts(): Promise<void> {
 // 保存快捷键列表
 async function saveShortcuts(): Promise<void> {
   try {
-    await window.ztools.dbPut('global-shortcuts', JSON.parse(JSON.stringify(shortcuts.value)))
+    await window.ztools.internal.dbPut(
+      'global-shortcuts',
+      JSON.parse(JSON.stringify(shortcuts.value))
+    )
     console.log('保存全局快捷键成功')
   } catch (error) {
     console.error('保存全局快捷键失败:', error)
@@ -169,11 +172,14 @@ async function handleSave(recordedShortcut: string, targetCommand: string): Prom
     try {
       // 如果快捷键改变了，需要先注销旧的
       if (oldShortcut !== recordedShortcut) {
-        await window.ztools.unregisterGlobalShortcut(oldShortcut)
+        await window.ztools.internal.unregisterGlobalShortcut(oldShortcut)
       }
 
       // 注册新快捷键
-      const result = await window.ztools.registerGlobalShortcut(recordedShortcut, targetCommand)
+      const result = await window.ztools.internal.registerGlobalShortcut(
+        recordedShortcut,
+        targetCommand
+      )
 
       if (result.success) {
         // 更新列表
@@ -190,14 +196,20 @@ async function handleSave(recordedShortcut: string, targetCommand: string): Prom
       } else {
         // 注册失败，恢复旧快捷键
         if (oldShortcut !== recordedShortcut) {
-          await window.ztools.registerGlobalShortcut(oldShortcut, editingShortcut.value.target)
+          await window.ztools.internal.registerGlobalShortcut(
+            oldShortcut,
+            editingShortcut.value.target
+          )
         }
         alert(`快捷键注册失败: ${result.error}`)
       }
     } catch (error: any) {
       // 注册失败，恢复旧快捷键
       if (oldShortcut !== recordedShortcut) {
-        await window.ztools.registerGlobalShortcut(oldShortcut, editingShortcut.value.target)
+        await window.ztools.internal.registerGlobalShortcut(
+          oldShortcut,
+          editingShortcut.value.target
+        )
       }
       console.error('更新快捷键失败:', error)
       alert(`更新快捷键失败: ${error.message || '未知错误'}`)
@@ -227,7 +239,10 @@ async function handleSave(recordedShortcut: string, targetCommand: string): Prom
 
   // 注册全局快捷键
   try {
-    const result = await window.ztools.registerGlobalShortcut(recordedShortcut, targetCommand)
+    const result = await window.ztools.internal.registerGlobalShortcut(
+      recordedShortcut,
+      targetCommand
+    )
     if (result.success) {
       alert('快捷键添加成功!')
       closeEditor()
@@ -258,7 +273,7 @@ async function handleDelete(id: string): Promise<void> {
   isDeleting.value = true
   try {
     // 注销全局快捷键
-    const result = await window.ztools.unregisterGlobalShortcut(shortcut.shortcut)
+    const result = await window.ztools.internal.unregisterGlobalShortcut(shortcut.shortcut)
     if (result.success) {
       // 从列表中移除
       shortcuts.value = shortcuts.value.filter((s) => s.id !== id)

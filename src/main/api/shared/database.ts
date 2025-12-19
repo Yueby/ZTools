@@ -342,176 +342,22 @@ export class DatabaseAPI {
     // ============ 插件数据管理 API ============
     // 获取所有插件的数据统计
     ipcMain.handle('get-plugin-data-stats', async () => {
-      try {
-        // 获取所有以 PLUGIN/ 开头的文档
-        const allDocs = lmdbInstance.allDocs('PLUGIN/')
-
-        // 统计每个插件的文档数量和附件数量
-        const pluginStats = new Map<string, { docCount: number; attachmentCount: number }>()
-
-        for (const doc of allDocs) {
-          // 提取插件名称：PLUGIN/{pluginName}/...
-          const match = doc._id.match(/^PLUGIN\/([^/]+)\//)
-          if (match) {
-            const pluginName = match[1]
-            const stats = pluginStats.get(pluginName) || { docCount: 0, attachmentCount: 0 }
-            stats.docCount++
-            pluginStats.set(pluginName, stats)
-          }
-        }
-
-        // 获取附件数据库中的附件元数据
-        // 附件存储格式：attachment-ext:PLUGIN/{pluginName}/{id}
-        const attachmentDb = lmdbInstance.getAttachmentDb()
-        for (const { key } of attachmentDb.getRange({ start: 'attachment-ext:PLUGIN/' })) {
-          if (!key.startsWith('attachment-ext:PLUGIN/')) break
-
-          // 提取插件名称
-          const match = key.match(/^attachment-ext:PLUGIN\/([^/]+)\//)
-          if (match) {
-            const pluginName = match[1]
-            const stats = pluginStats.get(pluginName) || { docCount: 0, attachmentCount: 0 }
-            stats.attachmentCount++
-            pluginStats.set(pluginName, stats)
-          }
-        }
-
-        // 获取插件列表以获取 logo 信息
-        const pluginsDoc = lmdbInstance.get('ZTOOLS/plugins')
-        const plugins = pluginsDoc?.data || []
-
-        // 转换为数组格式，包含 logo 和附件数量
-        const data = Array.from(pluginStats.entries()).map(([pluginName, stats]) => {
-          const plugin = plugins.find((p: any) => p.name === pluginName)
-          return {
-            pluginName,
-            docCount: stats.docCount,
-            attachmentCount: stats.attachmentCount,
-            logo: plugin?.logo || null
-          }
-        })
-
-        return { success: true, data }
-      } catch (error: unknown) {
-        console.error('获取插件数据统计失败:', error)
-        return { success: false, error: error instanceof Error ? error.message : String(error) }
-      }
+      return await this._getPluginDataStats()
     })
 
     // 获取指定插件的所有文档 key（包括附件）
     ipcMain.handle('get-plugin-doc-keys', async (_event, pluginName: string) => {
-      try {
-        const prefix = `PLUGIN/${pluginName}/`
-        const allDocs = lmdbInstance.allDocs(prefix)
-
-        // 提取文档 key（去掉前缀）
-        const keys = allDocs.map((doc) => ({
-          key: doc._id.substring(prefix.length),
-          type: 'document'
-        }))
-
-        // 获取附件列表
-        const attachmentDb = lmdbInstance.getAttachmentDb()
-        const attachmentPrefix = `attachment-ext:${prefix}`
-        for (const { key } of attachmentDb.getRange({ start: attachmentPrefix })) {
-          if (!key.startsWith(attachmentPrefix)) break
-
-          // 提取附件 key（去掉 attachment-ext:PLUGIN/{pluginName}/ 前缀）
-          const attachmentKey = key.substring(attachmentPrefix.length)
-          keys.push({
-            key: attachmentKey,
-            type: 'attachment'
-          })
-        }
-
-        return { success: true, data: keys }
-      } catch (error: unknown) {
-        console.error('获取插件文档 keys 失败:', error)
-        return { success: false, error: error instanceof Error ? error.message : String(error) }
-      }
+      return await this._getPluginDocKeys(pluginName)
     })
 
     // 获取指定插件的指定文档
     ipcMain.handle('get-plugin-doc', async (_event, pluginName: string, key: string) => {
-      try {
-        const docId = `PLUGIN/${pluginName}/${key}`
-
-        // 先尝试从主数据库获取
-        const doc = lmdbInstance.get(docId)
-        if (doc) {
-          return { success: true, data: doc, type: 'document' }
-        }
-
-        // 尝试从附件数据库获取
-        const attachmentDb = lmdbInstance.getAttachmentDb()
-        const metadataStr = attachmentDb.get(`attachment-ext:${docId}`)
-        if (metadataStr) {
-          const metadata = JSON.parse(metadataStr)
-          return {
-            success: true,
-            data: {
-              _id: docId,
-              ...metadata
-            },
-            type: 'attachment'
-          }
-        }
-
-        return { success: false, error: '文档不存在' }
-      } catch (error: unknown) {
-        console.error('获取插件文档失败:', error)
-        return { success: false, error: error instanceof Error ? error.message : String(error) }
-      }
+      return await this._getPluginDoc(pluginName, key)
     })
 
     // 清空指定插件的所有文档（包括附件）
     ipcMain.handle('clear-plugin-data', async (_event, pluginName: string) => {
-      try {
-        const prefix = `PLUGIN/${pluginName}/`
-        const allDocs = lmdbInstance.allDocs(prefix)
-
-        // 批量删除所有文档
-        let deletedCount = 0
-        for (const doc of allDocs) {
-          const result = lmdbInstance.remove(doc._id)
-          if (result.ok) {
-            deletedCount++
-          }
-        }
-
-        // 删除所有附件
-        const attachmentDb = lmdbInstance.getAttachmentDb()
-        const attachmentPrefix = `attachment:`
-        const metadataPrefix = `attachment-ext:`
-
-        // 收集需要删除的附件 key
-        const attachmentKeysToDelete: string[] = []
-        for (const { key } of attachmentDb.getRange({ start: attachmentPrefix + prefix })) {
-          if (!key.startsWith(attachmentPrefix + prefix)) break
-          attachmentKeysToDelete.push(key)
-        }
-
-        // 收集需要删除的元数据 key
-        const metadataKeysToDelete: string[] = []
-        for (const { key } of attachmentDb.getRange({ start: metadataPrefix + prefix })) {
-          if (!key.startsWith(metadataPrefix + prefix)) break
-          metadataKeysToDelete.push(key)
-        }
-
-        // 删除附件和元数据
-        for (const key of attachmentKeysToDelete) {
-          attachmentDb.removeSync(key)
-          deletedCount++
-        }
-        for (const key of metadataKeysToDelete) {
-          attachmentDb.removeSync(key)
-        }
-
-        return { success: true, deletedCount }
-      } catch (error: unknown) {
-        console.error('清空插件数据失败:', error)
-        return { success: false, error: error instanceof Error ? error.message : String(error) }
-      }
+      return await this._clearPluginData(pluginName)
     })
   }
 
@@ -556,6 +402,226 @@ export class DatabaseAPI {
       console.error('dbGet 失败:', key, error)
       return null
     }
+  }
+
+  /**
+   * 获取所有插件的数据统计（供内部调用）
+   */
+  private async _getPluginDataStats(): Promise<{
+    success: boolean
+    data?: Array<{
+      pluginName: string
+      docCount: number
+      attachmentCount: number
+      logo: string | null
+    }>
+    error?: string
+  }> {
+    try {
+      const allDocs = lmdbInstance.allDocs('PLUGIN/')
+      const pluginStats = new Map<string, { docCount: number; attachmentCount: number }>()
+
+      for (const doc of allDocs) {
+        const match = doc._id.match(/^PLUGIN\/([^/]+)\//)
+        if (match) {
+          const pluginName = match[1]
+          const stats = pluginStats.get(pluginName) || { docCount: 0, attachmentCount: 0 }
+          stats.docCount++
+          pluginStats.set(pluginName, stats)
+        }
+      }
+
+      const attachmentDb = lmdbInstance.getAttachmentDb()
+      for (const { key } of attachmentDb.getRange({ start: 'attachment-ext:PLUGIN/' })) {
+        if (!key.startsWith('attachment-ext:PLUGIN/')) break
+        const match = key.match(/^attachment-ext:PLUGIN\/([^/]+)\//)
+        if (match) {
+          const pluginName = match[1]
+          const stats = pluginStats.get(pluginName) || { docCount: 0, attachmentCount: 0 }
+          stats.attachmentCount++
+          pluginStats.set(pluginName, stats)
+        }
+      }
+
+      const pluginsDoc = lmdbInstance.get('ZTOOLS/plugins')
+      const plugins = pluginsDoc?.data || []
+
+      const data = Array.from(pluginStats.entries()).map(([pluginName, stats]) => {
+        const plugin = plugins.find((p: any) => p.name === pluginName)
+        return {
+          pluginName,
+          docCount: stats.docCount,
+          attachmentCount: stats.attachmentCount,
+          logo: plugin?.logo || null
+        }
+      })
+
+      return { success: true, data }
+    } catch (error: unknown) {
+      console.error('获取插件数据统计失败:', error)
+      return { success: false, error: error instanceof Error ? error.message : String(error) }
+    }
+  }
+
+  /**
+   * 获取指定插件的所有文档 key（供内部调用）
+   */
+  private async _getPluginDocKeys(
+    pluginName: string
+  ): Promise<{ success: boolean; data?: Array<{ key: string; type: string }>; error?: string }> {
+    try {
+      const prefix = `PLUGIN/${pluginName}/`
+      const allDocs = lmdbInstance.allDocs(prefix)
+
+      const keys = allDocs.map((doc) => ({
+        key: doc._id.substring(prefix.length),
+        type: 'document'
+      }))
+
+      const attachmentDb = lmdbInstance.getAttachmentDb()
+      const attachmentPrefix = `attachment-ext:${prefix}`
+      for (const { key } of attachmentDb.getRange({ start: attachmentPrefix })) {
+        if (!key.startsWith(attachmentPrefix)) break
+        const attachmentKey = key.substring(attachmentPrefix.length)
+        keys.push({ key: attachmentKey, type: 'attachment' })
+      }
+
+      return { success: true, data: keys }
+    } catch (error: unknown) {
+      console.error('获取插件文档 key 失败:', error)
+      return { success: false, error: error instanceof Error ? error.message : String(error) }
+    }
+  }
+
+  /**
+   * 获取指定插件的文档或附件内容（供内部调用）
+   */
+  private async _getPluginDoc(
+    pluginName: string,
+    key: string
+  ): Promise<{ success: boolean; data?: any; type?: string; error?: string }> {
+    try {
+      const docId = `PLUGIN/${pluginName}/${key}`
+
+      // 先尝试从主数据库获取
+      const doc = lmdbInstance.get(docId)
+      if (doc) {
+        return { success: true, data: doc, type: 'document' }
+      }
+
+      // 尝试从附件数据库获取
+      const attachmentDb = lmdbInstance.getAttachmentDb()
+      const metadataStr = attachmentDb.get(`attachment-ext:${docId}`)
+      if (metadataStr) {
+        const metadata = JSON.parse(metadataStr)
+        return {
+          success: true,
+          data: {
+            _id: docId,
+            ...metadata
+          },
+          type: 'attachment'
+        }
+      }
+
+      return { success: false, error: '文档不存在' }
+    } catch (error: unknown) {
+      console.error('获取插件文档失败:', error)
+      return { success: false, error: error instanceof Error ? error.message : String(error) }
+    }
+  }
+
+  /**
+   * 清空指定插件的所有数据（供内部调用）
+   */
+  private async _clearPluginData(
+    pluginName: string
+  ): Promise<{ success: boolean; deletedCount?: number; error?: string }> {
+    try {
+      const prefix = `PLUGIN/${pluginName}/`
+      const allDocs = lmdbInstance.allDocs(prefix)
+
+      let deletedCount = 0
+      for (const doc of allDocs) {
+        const result = lmdbInstance.remove(doc._id)
+        if (result.ok) {
+          deletedCount++
+        }
+      }
+
+      const attachmentDb = lmdbInstance.getAttachmentDb()
+      const attachmentPrefix = `attachment:`
+      const metadataPrefix = `attachment-ext:`
+
+      const attachmentKeysToDelete: string[] = []
+      for (const { key } of attachmentDb.getRange({ start: attachmentPrefix + prefix })) {
+        if (!key.startsWith(attachmentPrefix + prefix)) break
+        attachmentKeysToDelete.push(key)
+      }
+
+      const metadataKeysToDelete: string[] = []
+      for (const { key } of attachmentDb.getRange({ start: metadataPrefix + prefix })) {
+        if (!key.startsWith(metadataPrefix + prefix)) break
+        metadataKeysToDelete.push(key)
+      }
+
+      for (const key of attachmentKeysToDelete) {
+        attachmentDb.removeSync(key)
+        deletedCount++
+      }
+      for (const key of metadataKeysToDelete) {
+        attachmentDb.removeSync(key)
+      }
+
+      return { success: true, deletedCount }
+    } catch (error: unknown) {
+      console.error('清空插件数据失败:', error)
+      return { success: false, error: error instanceof Error ? error.message : String(error) }
+    }
+  }
+
+  /**
+   * 公共方法：获取所有插件的数据统计
+   */
+  public async getPluginDataStats(): Promise<{
+    success: boolean
+    data?: Array<{
+      pluginName: string
+      docCount: number
+      attachmentCount: number
+      logo: string | null
+    }>
+    error?: string
+  }> {
+    return await this._getPluginDataStats()
+  }
+
+  /**
+   * 公共方法：获取指定插件的所有文档 key
+   */
+  public async getPluginDocKeys(
+    pluginName: string
+  ): Promise<{ success: boolean; data?: Array<{ key: string; type: string }>; error?: string }> {
+    return await this._getPluginDocKeys(pluginName)
+  }
+
+  /**
+   * 公共方法：获取指定插件的文档或附件内容
+   */
+  public async getPluginDoc(
+    pluginName: string,
+    key: string
+  ): Promise<{ success: boolean; data?: any; type?: string; error?: string }> {
+    return await this._getPluginDoc(pluginName, key)
+  }
+
+  /**
+   * 公共方法：清空指定插件的所有数据
+   */
+  public async clearPluginData(
+    pluginName: string
+  ): Promise<{ success: boolean; deletedCount?: number; error?: string }> {
+    return await this._clearPluginData(pluginName)
   }
 }
 

@@ -7,6 +7,7 @@ import api from './api/index.js'
 import mainPreload from '../../resources/preload.js?asset'
 import detachedWindowManager from './core/detachedWindowManager.js'
 import { GLOBAL_SCROLLBAR_CSS } from './core/globalStyles.js'
+import { isInternalPlugin } from './core/internalPlugins'
 import pluginWindowManager from './core/pluginWindowManager.js'
 
 console.log('mainPreload', mainPreload)
@@ -48,6 +49,10 @@ class PluginManager {
       }
     } catch (error) {
       console.error('查询插件信息失败:', error)
+    }
+
+    if (this.currentPluginPath != null) {
+      this.hidePluginView()
     }
 
     // 先尝试从缓存中复用已有视图
@@ -145,6 +150,9 @@ class PluginManager {
           session: sess
         }
       })
+
+      // 设置透明背景，支持 fullscreen-ui 效果
+      this.pluginView.setBackgroundColor('#00000000')
 
       // 监听 Cmd+D / Ctrl+D 快捷键（ESC 改为在插件 preload 中通过 JS 拦截后再通过 IPC 通知）
       this.pluginView.webContents.on('before-input-event', (_event, input) => {
@@ -307,14 +315,6 @@ class PluginManager {
   // 获取所有运行中的插件信息 (包含路径和名称)
   public getRunningPluginsInfo(): Array<{ path: string; name: string }> {
     return this.pluginViews.map((v) => ({ path: v.path, name: v.name }))
-  }
-
-  // 通过 webContents 查找插件信息
-  public getPluginInfoByWebContents(
-    webContents: any
-  ): { name: string; logo?: string; path: string } | null {
-    const plugin = this.pluginViews.find((v) => v.view.webContents === webContents)
-    return plugin ? { name: plugin.name, logo: plugin.logo, path: plugin.path } : null
   }
 
   // 通过 webContents 查找插件名称
@@ -725,6 +725,49 @@ class PluginManager {
         error: error instanceof Error ? error.message : '未知错误'
       }
     }
+  }
+
+  /**
+   * 根据 WebContents 获取插件信息
+   * @param webContents WebContents 实例
+   * @returns 插件信息，如果不是插件则返回 null
+   */
+  public getPluginInfoByWebContents(webContents: WebContents): {
+    name: string
+    path: string
+    isInternal: boolean
+  } | null {
+    // 遍历缓存的插件视图
+    for (const pluginViewInfo of this.pluginViews) {
+      if (pluginViewInfo.view.webContents === webContents) {
+        return {
+          name: pluginViewInfo.name,
+          path: pluginViewInfo.path,
+          isInternal: isInternalPlugin(pluginViewInfo.name)
+        }
+      }
+    }
+    return null
+  }
+
+  /**
+   * 根据插件名称获取插件的 WebContents
+   * @param name 插件名称
+   * @returns WebContents 实例，如果未找到则返回 null
+   */
+  public getPluginWebContentsByName(name: string): WebContents | null {
+    const plugin = this.pluginViews.find((v) => v.name === name)
+    return plugin ? plugin.view.webContents : null
+  }
+
+  /**
+   * 检查调用者是否为内置插件
+   * @param event IPC 事件对象
+   * @returns 是否为内置插件调用
+   */
+  public isInternalPluginCaller(event: Electron.IpcMainInvokeEvent): boolean {
+    const pluginInfo = this.getPluginInfoByWebContents(event.sender)
+    return pluginInfo?.isInternal ?? false
   }
 }
 

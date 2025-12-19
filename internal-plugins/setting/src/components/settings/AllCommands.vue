@@ -134,12 +134,31 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { useCommandDataStore, type Command } from '../../stores/commandDataStore'
 import CommandCard from './common/CommandCard.vue'
 import CommandTag from './common/CommandTag.vue'
 import FeatureCard from './common/FeatureCard.vue'
 
-const commandDataStore = useCommandDataStore()
+// 定义 Command 类型（从 commandDataStore 复制）
+export type CommandType = 'direct' | 'plugin' | 'builtin'
+export type CommandSubType = 'app' | 'system-setting'
+export type CommandCmdType = 'text' | 'regex' | 'over'
+
+export interface Command {
+  name: string
+  path?: string
+  icon?: string
+  type: CommandType
+  subType?: CommandSubType
+  pinyin?: string
+  pinyinAbbr?: string
+  featureCode?: string
+  pluginExplain?: string
+  cmdType?: CommandCmdType
+  matchCmd?: {
+    type: string
+    match: string
+  }
+}
 
 interface Source {
   type?: string
@@ -149,13 +168,17 @@ interface Source {
   logo?: string
 }
 
+// 本地状态：指令数据
+const commands = ref<Command[]>([])
+const regexCommands = ref<Command[]>([])
+
 const plugins = ref<any[]>([])
 const selectedSource = ref<Source | null>(null)
 const activeTab = ref<'text' | 'match'>('text')
 
 // 所有指令
-const allCommands = computed(() => commandDataStore.commands)
-const allRegexCommands = computed(() => commandDataStore.regexCommands)
+const allCommands = computed(() => commands.value)
+const allRegexCommands = computed(() => regexCommands.value)
 
 // 统计
 const appCount = computed(
@@ -183,8 +206,8 @@ const systemCommands = computed(() => {
     )
   }
 
-  // 应用特殊指令配置（如系统设置的统一图标）
-  return filteredCommands.map((cmd) => commandDataStore.applySpecialConfig(cmd))
+  // 系统设置的图标已经在后端处理好了，直接返回
+  return filteredCommands
 })
 
 // 按 feature 分组的插件功能
@@ -294,6 +317,21 @@ function getPluginCommandCount(plugin: any): number {
   return textCommandCount + matchCommandCount
 }
 
+// 加载指令数据
+async function loadCommands(): Promise<void> {
+  try {
+    const result = await window.ztools.internal.getCommands()
+    commands.value = result.commands
+    regexCommands.value = result.regexCommands
+    console.log('加载指令数据成功:', {
+      commands: commands.value.length,
+      regexCommands: regexCommands.value.length
+    })
+  } catch (error) {
+    console.error('加载指令数据失败:', error)
+  }
+}
+
 // 选择来源
 function selectSource(source: Source): void {
   selectedSource.value = source
@@ -302,7 +340,10 @@ function selectSource(source: Source): void {
 
 // 初始化
 onMounted(async () => {
-  plugins.value = await window.ztools.getPlugins()
+  // 加载指令数据
+  await loadCommands()
+  // 加载插件列表
+  plugins.value = await window.ztools.internal.getPlugins()
   // 默认选中系统应用
   if (appCount.value > 0) {
     selectSource({ subType: 'app', name: '系统应用' })
