@@ -72,6 +72,11 @@ export class PluginWindowAPI {
       pluginWindowManager.sendToParent(event.sender, channel, args)
     })
 
+    // 显示主窗口
+    ipcMain.handle('show-main-window', () => {
+      windowManager.showWindow()
+    })
+
     // 隐藏主窗口
     ipcMain.handle('hide-main-window', (_event, isRestorePreWindow: boolean = true) => {
       windowManager.hideWindow(isRestorePreWindow)

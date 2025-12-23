@@ -116,7 +116,10 @@
         <AdaptiveIcon
           :src="avatarUrl"
           :force-adaptive="isDefaultAvatar"
-          :class="['search-btn', { 'plugin-logo': windowStore.currentPlugin?.logo }]"
+          :class="[
+            'search-btn',
+            { 'plugin-logo': windowStore.currentPlugin?.logo && !isPluginLoading }
+          ]"
           draggable="false"
         />
         <div v-if="isPluginLoading" class="avatar-spinner"></div>

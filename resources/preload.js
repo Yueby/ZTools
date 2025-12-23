@@ -176,6 +176,10 @@ window.ztools = {
       callback(image)
     }
   },
+  // 显示主窗口
+  showMainWindow: async () => {
+    return await electron.ipcRenderer.invoke('show-main-window')
+  },
   // 隐藏主窗口
   hideMainWindow: async (isRestorePreWindow = true) => {
     return await electron.ipcRenderer.invoke('hide-main-window', isRestorePreWindow)
