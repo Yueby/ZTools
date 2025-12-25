@@ -18,10 +18,10 @@ export class PromiseApi {
     return new Promise((resolve, reject) => {
       setImmediate(() => {
         try {
-          // console.log('lmdb put', doc)
           const result = this.syncApi.put(doc)
           resolve(result)
         } catch (e) {
+          console.error('put error:', e)
           reject(e)
         }
       })
@@ -155,6 +155,44 @@ export class PromiseApi {
         try {
           const result = this.syncApi.getAttachmentType(id)
           resolve(result)
+        } catch (e) {
+          reject(e)
+        }
+      })
+    })
+  }
+
+  /**
+   * 获取文档的同步元数据（异步）
+   * @param id 文档 ID
+   * @returns Promise<同步元数据对象>，不存在返回 null
+   */
+  async getSyncMeta(
+    id: string
+  ): Promise<{ _rev: string; _lastModified?: number; _cloudSynced?: boolean } | null> {
+    return new Promise((resolve, reject) => {
+      setImmediate(() => {
+        try {
+          const result = this.syncApi.getSyncMeta(id)
+          resolve(result)
+        } catch (e) {
+          reject(e)
+        }
+      })
+    })
+  }
+
+  /**
+   * 更新文档的同步状态（异步）
+   * @param id 文档 ID
+   * @param cloudSynced 是否已同步
+   */
+  async updateSyncStatus(id: string, cloudSynced: boolean): Promise<void> {
+    return new Promise((resolve, reject) => {
+      setImmediate(() => {
+        try {
+          this.syncApi.updateSyncStatus(id, cloudSynced)
+          resolve()
         } catch (e) {
           reject(e)
         }

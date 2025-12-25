@@ -13,6 +13,7 @@ import settingsAPI from './renderer/settings'
 import systemAPI from './renderer/system'
 import { systemSettingsAPI } from './renderer/systemSettings'
 import windowAPI from './renderer/window'
+import syncAPI from './renderer/sync'
 
 // 插件专用API
 import windowManager from '../managers/windowManager'
@@ -57,6 +58,7 @@ class APIManager {
     settingsAPI.init(mainWindow, pluginManager)
     systemAPI.init(mainWindow)
     systemSettingsAPI.init()
+    syncAPI.init()
 
     // 初始化插件API
     pluginLifecycleAPI.init(mainWindow, pluginManager)

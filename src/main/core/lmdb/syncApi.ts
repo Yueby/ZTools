@@ -47,28 +47,75 @@ export class SyncApi {
         return createErrorResult('exception', 'Document size exceeds 1M', doc._id)
       }
 
-      // 3. 使用事务保证原子性
+      // 3. 准备同步元数据（如果需要同步）
+      let syncMeta: any = null
+      if (this.shouldSync(doc._id)) {
+        syncMeta = {
+          _lastModified: Date.now(),
+          _cloudSynced: false
+        }
+      }
+
+      // 4. 移除文档中的同步字段（这些字段应该存储在 metaDb 中）
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { _cloudSynced, _lastModified, ...docWithoutSyncFields } = doc
+
+      // 5. 使用事务保证原子性
       return this.env.transactionSync(() => {
         const id = doc._id
-        const existingRev = this.metaDb.get(id)
+        const existingMeta = this.metaDb.get(id)
 
-        // 4. 版本验证
-        if (existingRev) {
+        // 6. 版本验证
+        if (existingMeta) {
           // 文档已存在，必须提供正确的 _rev
+          let existingRev: string
+          // 解析元数据（可能是 JSON 字符串或纯字符串）
+          if (existingMeta.startsWith('{')) {
+            // 新格式：JSON 对象
+            const meta = safeJsonParse(existingMeta)
+            existingRev = meta._rev
+          } else {
+            // 旧格式：只有 _rev 字符串
+            existingRev = existingMeta
+          }
+
           if (!doc._rev || doc._rev !== existingRev) {
+            console.log('版本验证失败', doc._rev, existingRev)
             return createErrorResult('conflict', 'Document update conflict', id)
           }
         }
 
-        // 5. 生成新版本
+        // 7. 生成新版本
+        let existingRev: string | undefined
+        if (existingMeta) {
+          if (existingMeta.startsWith('{')) {
+            const meta = safeJsonParse(existingMeta)
+            existingRev = meta._rev
+          } else {
+            existingRev = existingMeta
+          }
+        }
         const newRev = generateNewRev(existingRev)
-        const docToSave = { ...doc, _rev: newRev }
+        const docToSave = { ...docWithoutSyncFields, _rev: newRev }
 
-        // 6. 保存文档和元数据
+        // 8. 保存文档和元数据
         this.mainDb.putSync(id, safeJsonStringify(docToSave))
-        this.metaDb.putSync(id, newRev)
 
-        // 7. 更新原始文档的 _rev（保持 UTools 行为）
+        // 9. 保存元数据（包含版本号和同步信息）
+        if (syncMeta) {
+          const metaToSave = {
+            _rev: newRev,
+            _lastModified: syncMeta._lastModified,
+            _cloudSynced: syncMeta._cloudSynced
+          }
+          // metaDb 使用 string 编码，需要序列化对象
+          this.metaDb.putSync(id, safeJsonStringify(metaToSave))
+          console.log('metaDb', metaToSave)
+        } else {
+          this.metaDb.putSync(id, newRev)
+        }
+
+        // 10. 更新原始文档的 _rev（保持 UTools 行为）
         doc._rev = newRev
 
         return createSuccessResult(id, newRev)
@@ -76,6 +123,75 @@ export class SyncApi {
     } catch (e: any) {
       console.error('put error:', e)
       return createErrorResult(e.name || 'exception', e.message, doc._id)
+    }
+  }
+
+  /**
+   * 判断文档是否需要同步
+   */
+  private shouldSync(docId: string): boolean {
+    // 同步白名单
+    const syncPrefixes = ['ZTOOLS/pinned-apps', 'ZTOOLS/settings-general', 'PLUGIN/']
+
+    return syncPrefixes.some((prefix) => docId.startsWith(prefix))
+  }
+
+  /**
+   * 获取文档的同步元数据
+   * @param id 文档 ID
+   * @returns 同步元数据对象，不存在返回 null
+   */
+  getSyncMeta(id: string): { _rev: string; _lastModified?: number; _cloudSynced?: boolean } | null {
+    try {
+      const metaStr = this.metaDb.get(id)
+      if (!metaStr) {
+        return null
+      }
+
+      // 兼容旧格式（只有 _rev 字符串）
+      if (metaStr.startsWith('{')) {
+        // 新格式：JSON 对象
+        return safeJsonParse(metaStr)
+      } else {
+        // 旧格式：只有 _rev 字符串
+        return { _rev: metaStr }
+      }
+    } catch (e: any) {
+      console.error('getSyncMeta error:', e)
+      return null
+    }
+  }
+
+  /**
+   * 更新文档的同步状态（不修改文档内容）
+   * @param id 文档 ID
+   * @param cloudSynced 是否已同步
+   */
+  updateSyncStatus(id: string, cloudSynced: boolean): void {
+    try {
+      const metaStr = this.metaDb.get(id)
+      if (!metaStr) {
+        console.warn(`updateSyncStatus: 文档不存在 ${id}`)
+        return
+      }
+
+      let meta: any
+      // 兼容旧格式
+      if (metaStr.startsWith('{')) {
+        // 新格式：JSON 对象
+        meta = safeJsonParse(metaStr)
+      } else {
+        // 旧格式：只有 _rev 字符串
+        meta = { _rev: metaStr }
+      }
+
+      // 更新同步状态
+      meta._cloudSynced = cloudSynced
+
+      // 保存回 metaDb
+      this.metaDb.putSync(id, safeJsonStringify(meta))
+    } catch (e: any) {
+      console.error('updateSyncStatus error:', e)
     }
   }
 

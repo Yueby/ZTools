@@ -152,6 +152,64 @@ declare global {
           isDark: boolean
           needsAdaptation: boolean
         }>
+
+        // WebDAV 同步
+        syncGetConfig: () => Promise<{
+          success: boolean
+          config?: {
+            enabled: boolean
+            serverUrl: string
+            username: string
+            password: string
+            syncInterval: number
+            lastSyncTime: number
+          }
+          error?: string
+        }>
+        syncGetUnsyncedCount: () => Promise<{
+          success: boolean
+          count?: number
+          error?: string
+        }>
+        syncStopAutoSync: () => Promise<{
+          success: boolean
+          error?: string
+        }>
+        syncTestConnection: (config: {
+          serverUrl: string
+          username: string
+          password: string
+        }) => Promise<{
+          success: boolean
+          error?: string
+        }>
+        syncSaveConfig: (config: {
+          enabled: boolean
+          serverUrl: string
+          username: string
+          password: string
+          syncInterval: number
+        }) => Promise<{
+          success: boolean
+          error?: string
+        }>
+        syncPerformSync: () => Promise<{
+          success: boolean
+          result?: {
+            uploaded: number
+            downloaded: number
+            errors: number
+          }
+          error?: string
+        }>
+        syncForceDownloadFromCloud: () => Promise<{
+          success: boolean
+          result?: {
+            downloaded: number
+            errors: number
+          }
+          error?: string
+        }>
       }
     }
   }

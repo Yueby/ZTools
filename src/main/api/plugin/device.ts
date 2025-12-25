@@ -14,6 +14,13 @@ export class PluginDeviceAPI {
     this.setupIPC()
   }
 
+  /**
+   * 公开方法：获取设备 ID（供其他模块使用）
+   */
+  public getDeviceIdPublic(): string {
+    return this.getDeviceId()
+  }
+
   private setupIPC(): void {
     // 获取设备 ID（同步方法，供插件使用）
     ipcMain.on('get-native-id', (event) => {

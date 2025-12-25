@@ -29,6 +29,10 @@ export default class LmdbDatabase {
     postAttachment: (id: string, attachment: Buffer | Uint8Array, type: string) => Promise<DbResult>
     getAttachment: (id: string) => Promise<Uint8Array | null>
     getAttachmentType: (id: string) => Promise<string | null>
+    getSyncMeta: (
+      id: string
+    ) => Promise<{ _rev: string; _lastModified?: number; _cloudSynced?: boolean } | null>
+    updateSyncStatus: (id: string, cloudSynced: boolean) => Promise<void>
   }
 
   /**
@@ -80,7 +84,10 @@ export default class LmdbDatabase {
       postAttachment: (id: string, attachment: Buffer | Uint8Array, type: string) =>
         this.promiseApi.postAttachment(id, attachment, type),
       getAttachment: (id: string) => this.promiseApi.getAttachment(id),
-      getAttachmentType: (id: string) => this.promiseApi.getAttachmentType(id)
+      getAttachmentType: (id: string) => this.promiseApi.getAttachmentType(id),
+      getSyncMeta: (id: string) => this.promiseApi.getSyncMeta(id),
+      updateSyncStatus: (id: string, cloudSynced: boolean) =>
+        this.promiseApi.updateSyncStatus(id, cloudSynced)
     }
   }
 

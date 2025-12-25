@@ -405,6 +405,17 @@ window.ztools = {
     updaterStartUpdate: async (updateInfo) =>
       await electron.ipcRenderer.invoke('internal:updater-start-update', updateInfo),
 
+    // ==================== WebDAV 同步 API ====================
+    syncTestConnection: async (config) =>
+      await electron.ipcRenderer.invoke('sync:test-connection', config),
+    syncSaveConfig: async (config) => await electron.ipcRenderer.invoke('sync:save-config', config),
+    syncGetConfig: async () => await electron.ipcRenderer.invoke('sync:get-config'),
+    syncPerformSync: async () => await electron.ipcRenderer.invoke('sync:perform-sync'),
+    syncForceDownloadFromCloud: async () =>
+      await electron.ipcRenderer.invoke('sync:force-download-from-cloud'),
+    syncStopAutoSync: async () => await electron.ipcRenderer.invoke('sync:stop-auto-sync'),
+    syncGetUnsyncedCount: async () => await electron.ipcRenderer.invoke('sync:get-unsynced-count'),
+
     // ==================== 其他 API ====================
     revealInFinder: async (path) =>
       await electron.ipcRenderer.invoke('internal:reveal-in-finder', path),

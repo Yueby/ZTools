@@ -31,6 +31,9 @@
       <!-- 全局快捷键 -->
       <GlobalShortcuts v-if="activeMenu === 'shortcuts'" />
 
+      <!-- WebDAV 同步 -->
+      <SyncSettings v-if="activeMenu === 'sync'" />
+
       <!-- 所有指令 -->
       <AllCommands v-if="activeMenu === 'all-commands'" />
     </div>
@@ -46,11 +49,12 @@ import GeneralSettings from './GeneralSettings.vue'
 import GlobalShortcuts from './GlobalShortcuts.vue'
 import PluginCenter from './PluginCenter.vue'
 import PluginMarket from './PluginMarket.vue'
+import SyncSettings from './SyncSettings.vue'
 
 // 菜单项类型
 interface MenuItem {
   id: string
-  icon: 'settings' | 'plugin' | 'keyboard' | 'store' | 'database' | 'list'
+  icon: 'settings' | 'plugin' | 'keyboard' | 'store' | 'database' | 'list' | 'cloud'
   label: string
 }
 
@@ -58,6 +62,7 @@ interface MenuItem {
 const menuItems: MenuItem[] = [
   { id: 'general', icon: 'settings', label: '通用设置' },
   { id: 'shortcuts', icon: 'keyboard', label: '全局快捷键' },
+  { id: 'sync', icon: 'cloud', label: 'WebDAV 同步' },
   { id: 'plugins', icon: 'plugin', label: '已安装插件' },
   { id: 'market', icon: 'store', label: '插件市场' },
   { id: 'data', icon: 'database', label: '我的数据' },
