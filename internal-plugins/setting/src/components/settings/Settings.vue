@@ -41,7 +41,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed } from 'vue'
 import Icon from '../common/Icon.vue'
 import AllCommands from './AllCommands.vue'
 import DataManagement from './DataManagement.vue'
@@ -50,6 +50,18 @@ import GlobalShortcuts from './GlobalShortcuts.vue'
 import PluginCenter from './PluginCenter.vue'
 import PluginMarket from './PluginMarket.vue'
 import SyncSettings from './SyncSettings.vue'
+
+// Props
+interface Props {
+  activePage: string
+}
+
+const props = defineProps<Props>()
+
+// Emits
+const emit = defineEmits<{
+  'update:activePage': [value: string]
+}>()
 
 // 菜单项类型
 interface MenuItem {
@@ -69,7 +81,11 @@ const menuItems: MenuItem[] = [
   { id: 'sync', icon: 'cloud', label: 'WebDAV 同步' }
 ]
 
-const activeMenu = ref('general')
+// 使用 computed 实现双向绑定
+const activeMenu = computed({
+  get: () => props.activePage,
+  set: (value) => emit('update:activePage', value)
+})
 </script>
 
 <style scoped>

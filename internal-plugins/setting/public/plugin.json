@@ -14,7 +14,43 @@
       "code": "settings",
       "explain": "应用设置",
       "icon": "logo.png",
-      "cmds": ["设置", "Settings", "偏好设置", "Preferences"]
+      "cmds": ["通用设置"]
+    },
+    {
+      "code": "shortcuts",
+      "explain": "全局快捷键",
+      "icon": "logo.png",
+      "cmds": ["全局快捷键"]
+    },
+    {
+      "code": "plugins",
+      "explain": "已安装插件",
+      "icon": "logo.png",
+      "cmds": ["已安装插件"]
+    },
+    {
+      "code": "plugin-market",
+      "explain": "插件市场",
+      "icon": "logo.png",
+      "cmds": ["插件市场"]
+    },
+    {
+      "code": "data",
+      "explain": "我的数据",
+      "icon": "logo.png",
+      "cmds": ["我的数据"]
+    },
+    {
+      "code": "all-commands",
+      "explain": "所有指令",
+      "icon": "logo.png",
+      "cmds": ["所有指令"]
+    },
+    {
+      "code": "sync",
+      "explain": "WebDAV 同步",
+      "icon": "logo.png",
+      "cmds": ["WebDAV 同步"]
     }
   ]
 }
