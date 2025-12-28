@@ -338,6 +338,13 @@ function keydownEvent(event: KeyboardEvent, direction: 'left' | 'right' | 'up' |
   if (isComposing.value) {
     return
   }
+
+  // 如果输入框有选中的文字,不触发列表导航
+  if (inputRef.value && inputRef.value.selectionStart !== inputRef.value.selectionEnd) {
+    event.stopPropagation()
+    return
+  }
+
   emit('arrow-keydown', event, direction)
 }
 
