@@ -165,7 +165,7 @@ export class UpdaterAPI {
 
       const zip = new AdmZip(tempZipPath)
       await new Promise<void>((resolve, reject) => {
-        zip.extractAllToAsync(extractPath, true, (error) => {
+        zip.extractAllToAsync(extractPath, true, (error: Error | null) => {
           if (error) {
             reject(error)
           } else {
@@ -203,7 +203,7 @@ export class UpdaterAPI {
   /**
    * 获取更新路径配置
    */
-  private getUpdatePaths(extractPath: string): UpdatePaths {
+  private async getUpdatePaths(extractPath: string): Promise<UpdatePaths> {
     const isMac = process.platform === 'darwin'
     const isWin = process.platform === 'win32'
     const appPath = process.execPath
@@ -228,9 +228,29 @@ export class UpdaterAPI {
       asarDst = path.join(resourcesDir, 'app.asar')
       unpackedDst = path.join(resourcesDir, 'app.asar.unpacked')
     } else if (isWin) {
-      updaterPath = path.join(path.dirname(appPath), 'ztools-agent.exe')
-      const resourcesDir = path.join(path.dirname(appPath), 'resources')
+      const appDir = path.dirname(appPath)
+      const agentPath = path.join(appDir, 'ztools-agent.exe')
+      const oldUpdaterPath = path.join(appDir, 'ztools-updater.exe')
 
+      // 兼容旧版本：如果 ztools-agent.exe 不存在，尝试查找并重命名 ztools-updater.exe
+      try {
+        await fs.access(agentPath)
+        updaterPath = agentPath
+      } catch {
+        // ztools-agent.exe 不存在，尝试查找旧版本
+        try {
+          await fs.access(oldUpdaterPath)
+          // 找到旧版本，重命名为新版本
+          await fs.rename(oldUpdaterPath, agentPath)
+          console.log('已将 ztools-updater.exe 重命名为 ztools-agent.exe')
+          updaterPath = agentPath
+        } catch {
+          // 两个文件都不存在，使用默认路径（后续会报错）
+          updaterPath = agentPath
+        }
+      }
+
+      const resourcesDir = path.join(appDir, 'resources')
       asarDst = path.join(resourcesDir, 'app.asar')
       unpackedDst = path.join(resourcesDir, 'app.asar.unpacked')
     }
@@ -281,7 +301,7 @@ export class UpdaterAPI {
         throw new Error('没有可用的更新')
       }
 
-      const paths = this.getUpdatePaths(this.downloadedUpdatePath)
+      const paths = await this.getUpdatePaths(this.downloadedUpdatePath)
       await this.launchUpdater(paths)
 
       return { success: true }
@@ -402,7 +422,7 @@ export class UpdaterAPI {
       }
 
       // 2. 获取更新路径配置
-      const paths = this.getUpdatePaths(downloadResult.extractPath)
+      const paths = await this.getUpdatePaths(downloadResult.extractPath)
 
       // 3. 启动 updater 并退出应用
       await this.launchUpdater(paths)
