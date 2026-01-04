@@ -35,6 +35,33 @@ English | [简体中文](./README.md)
   <p><i>Quick launch and search functionality demo</i></p>
 </div>
 
+### Interface Showcase
+
+<div align="center">
+  <table>
+    <tr>
+      <td width="50%">
+        <img src="./.github/assets/main-light.png" alt="Main Interface - Light Theme">
+        <p align="center"><i>Main Interface - Light Theme</i></p>
+      </td>
+      <td width="50%">
+        <img src="./.github/assets/main-dark.png" alt="Main Interface - Dark Theme">
+        <p align="center"><i>Main Interface - Dark Theme</i></p>
+      </td>
+    </tr>
+    <tr>
+      <td width="50%">
+        <img src="./.github/assets/settings.png" alt="Settings">
+        <p align="center"><i>Settings - Theme Customization and General Settings</i></p>
+      </td>
+      <td width="50%">
+        <img src="./.github/assets/plugin-market.png" alt="Plugin Market">
+        <p align="center"><i>Plugin Market - Online Installation and Management</i></p>
+      </td>
+    </tr>
+  </table>
+</div>
+
 ## 🚀 Quick Start
 
 ### Installation
@@ -302,7 +329,7 @@ pnpm build:unpack       # Package without installer (for debugging)
 - [x] Data isolation
 - [x] Plugin market
 - [x] Custom global shortcuts
-- [ ] Separate plugins into independent windows
+- [x] Separate plugins into independent windows
 - [ ] Plugin auto-update
 - [ ] Cloud sync (optional)
 - [ ] Linux support

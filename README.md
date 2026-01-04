@@ -35,6 +35,33 @@ _uTools 的开源实现 | 支持 macOS 和 Windows_
   <p><i>快速启动应用和搜索功能演示</i></p>
 </div>
 
+### 界面展示
+
+<div align="center">
+  <table>
+    <tr>
+      <td width="50%">
+        <img src="./.github/assets/main-light.png" alt="主界面 - 亮色主题">
+        <p align="center"><i>主界面 - 亮色主题</i></p>
+      </td>
+      <td width="50%">
+        <img src="./.github/assets/main-dark.png" alt="主界面 - 暗色主题">
+        <p align="center"><i>主界面 - 暗色主题</i></p>
+      </td>
+    </tr>
+    <tr>
+      <td width="50%">
+        <img src="./.github/assets/settings.png" alt="设置界面">
+        <p align="center"><i>设置界面 - 主题定制和通用设置</i></p>
+      </td>
+      <td width="50%">
+        <img src="./.github/assets/plugin-market.png" alt="插件市场">
+        <p align="center"><i>插件市场 - 在线安装和管理插件</i></p>
+      </td>
+    </tr>
+  </table>
+</div>
+
 ## 🚀 快速开始
 
 ### 安装
@@ -302,7 +329,7 @@ pnpm build:unpack       # 打包但不生成安装包（调试用）
 - [x] 数据隔离
 - [x] 插件市场
 - [x] 全局快捷键自定义
-- [ ] 插件分离为独立窗口
+- [x] 插件分离为独立窗口
 - [ ] 插件自动更新
 - [ ] 云同步（可选）
 - [ ] Linux 支持
