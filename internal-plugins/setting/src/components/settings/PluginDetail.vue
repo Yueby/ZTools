@@ -305,14 +305,26 @@ async function loadReadme(): Promise<void> {
   readmeError.value = ''
 
   try {
-    // 如果是已安装的插件，读取本地 README
+    // 如果是已安装的插件，优先读取本地 README
     if (props.plugin.installed && props.plugin.path) {
       const result = await window.ztools.internal.getPluginReadme(props.plugin.path)
       if (result.success && result.content) {
         readmeContent.value = result.content
-      } else {
-        readmeError.value = result.error || '读取失败'
+        return
       }
+
+      // 本地读取失败，尝试从 GitHub 获取在线版本
+      if (props.plugin.name) {
+        console.log('本地 README 不存在，尝试从 GitHub 获取:', props.plugin.name)
+        const remoteResult = await window.ztools.internal.getPluginReadme(props.plugin.name)
+        if (remoteResult.success && remoteResult.content) {
+          readmeContent.value = remoteResult.content
+          return
+        }
+      }
+
+      // 本地和远程都失败
+      readmeError.value = '暂无详情'
     }
     // 如果是未安装的插件，从远程加载
     else if (props.plugin.name) {
