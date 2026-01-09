@@ -16,7 +16,7 @@ async function getIconFile(appPath: string): Promise<string> {
 
     plist.readFile(plistPath, (err: any, data: any) => {
       if (err || !data || !data.CFBundleIconFile) {
-        // 返回系统默认图标
+        // 返回系统默认图标（不需要 file:// 前缀，调用处会统一添加）
         return resolve(
           '/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/GenericApplicationIcon.icns'
         )
@@ -44,7 +44,7 @@ async function getIconFile(appPath: string): Promise<string> {
         }
       }
 
-      // 都找不到,返回默认图标
+      // 都找不到,返回默认图标（不需要 file:// 前缀，调用处会统一添加）
       resolve(
         '/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/GenericApplicationIcon.icns'
       )
@@ -101,13 +101,13 @@ export async function scanApplications(): Promise<Command[]> {
         return {
           name,
           path: appPath,
-          icon: iconPath
+          icon: `file://${iconPath}` // 添加 file:// 协议前缀
         }
       } catch {
         return {
           name: path.basename(appPath, '.app'),
           path: appPath,
-          icon: '/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/GenericApplicationIcon.icns'
+          icon: 'file:///System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/GenericApplicationIcon.icns' // 添加 file:// 协议前缀
         }
       }
     })
