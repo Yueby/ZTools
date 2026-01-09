@@ -71,6 +71,11 @@ export class SettingsAPI {
           this.setTheme(data.theme)
           console.log('启动时应用主题设置:', data.theme)
         }
+        // 应用自动返回搜索设置
+        if (data.autoBackToSearch) {
+          await windowManager.updateAutoBackToSearch(data.autoBackToSearch)
+          console.log('启动时应用自动返回搜索设置:', data.autoBackToSearch)
+        }
       }
 
       // 窗口位置现在由 windowManager.moveWindowToCursor() 处理

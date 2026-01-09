@@ -415,6 +415,9 @@ window.ztools = {
     // 通知主渲染进程更新自动清空配置
     updateAutoClear: async (autoClear) =>
       await electron.ipcRenderer.invoke('internal:update-auto-clear', autoClear),
+    // 通知主渲染进程更新自动返回搜索配置
+    updateAutoBackToSearch: async (autoBackToSearch) =>
+      await electron.ipcRenderer.invoke('internal:update-auto-back-to-search', autoBackToSearch),
     // 通知主渲染进程更新主题色
     updatePrimaryColor: async (primaryColor, customColor) =>
       await electron.ipcRenderer.invoke('internal:update-primary-color', primaryColor, customColor),

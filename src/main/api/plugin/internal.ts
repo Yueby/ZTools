@@ -318,6 +318,19 @@ export class InternalPluginAPI {
       return { success: true }
     })
 
+    // 更新自动返回搜索配置（直接通知主进程）
+    ipcMain.handle(
+      'internal:update-auto-back-to-search',
+      async (event, autoBackToSearch: string) => {
+        if (!requireInternalPlugin(this.pluginManager, event)) {
+          throw new PermissionDeniedError('internal:update-auto-back-to-search')
+        }
+        // 直接通知 windowManager 更新配置
+        await windowAPI.updateAutoBackToSearch(autoBackToSearch)
+        return { success: true }
+      }
+    )
+
     // 通知主渲染进程更新主题色
     ipcMain.handle(
       'internal:update-primary-color',

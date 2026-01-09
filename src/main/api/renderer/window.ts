@@ -142,6 +142,11 @@ export class WindowAPI {
     windowManager.showSettings()
     console.log('打开设置插件')
   }
+
+  public async updateAutoBackToSearch(autoBackToSearch: string): Promise<void> {
+    await windowManager.updateAutoBackToSearch(autoBackToSearch)
+    console.log('更新自动返回搜索配置:', autoBackToSearch)
+  }
 }
 
 export default new WindowAPI()

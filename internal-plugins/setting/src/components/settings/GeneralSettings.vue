@@ -250,6 +250,21 @@
       </div>
     </div>
 
+    <!-- 自动返回搜索设置 -->
+    <div class="setting-item">
+      <div class="setting-label">
+        <span>自动返回到搜索</span>
+        <span class="setting-desc">主窗口打开插件后隐藏，在设定时间后自动返回搜索界面</span>
+      </div>
+      <div class="setting-control">
+        <Dropdown
+          v-model="autoBackToSearch"
+          :options="autoBackToSearchOptions"
+          @change="handleAutoBackToSearchChange"
+        />
+      </div>
+    </div>
+
     <!-- 显示托盘图标设置 -->
     <div class="setting-item">
       <div class="setting-label">
@@ -302,6 +317,7 @@ import { useToast } from '../../composables/useToast'
 import {
   DEFAULT_AVATAR,
   DEFAULT_PLACEHOLDER,
+  type AutoBackToSearchOption,
   type AutoClearOption,
   type AutoPasteOption,
   type PrimaryColor,
@@ -344,6 +360,16 @@ const autoClearOptions = [
   { label: '从不', value: 'never' }
 ]
 
+const autoBackToSearchOptions = [
+  { label: '立即', value: 'immediately' },
+  { label: '30秒', value: '30s' },
+  { label: '1分钟', value: '1m' },
+  { label: '3分钟', value: '3m' },
+  { label: '5分钟', value: '5m' },
+  { label: '10分钟', value: '10m' },
+  { label: '从不', value: 'never' }
+]
+
 // 当前平台（与 window.ztools.getPlatform 返回类型保持一致）
 const platform = ref<'darwin' | 'win32' | 'linux'>('darwin')
 
@@ -359,6 +385,7 @@ const placeholder = ref(DEFAULT_PLACEHOLDER)
 const avatar = ref(DEFAULT_AVATAR)
 const autoPaste = ref<AutoPasteOption>('off')
 const autoClear = ref<AutoClearOption>('immediately')
+const autoBackToSearch = ref<AutoBackToSearchOption>('never')
 
 // 实际快捷键字符串
 const hotkey = ref('')
@@ -533,6 +560,18 @@ async function handleAutoClearChange(): Promise<void> {
     console.log('自动清空配置已更新:', autoClear.value)
   } catch (error) {
     console.error('保存自动清空配置失败:', error)
+  }
+}
+
+// 处理自动返回搜索配置变化
+async function handleAutoBackToSearchChange(): Promise<void> {
+  try {
+    await saveSettings()
+    // 通知主渲染进程更新
+    await window.ztools.internal.updateAutoBackToSearch(autoBackToSearch.value)
+    console.log('自动返回搜索配置已更新:', autoBackToSearch.value)
+  } catch (error) {
+    console.error('保存自动返回搜索配置失败:', error)
   }
 }
 
@@ -886,6 +925,7 @@ async function loadSettings(): Promise<void> {
       avatar.value = data.avatar ?? DEFAULT_AVATAR
       autoPaste.value = data.autoPaste ?? 'off'
       autoClear.value = data.autoClear ?? 'immediately'
+      autoBackToSearch.value = data.autoBackToSearch ?? 'never'
       theme.value = data.theme ?? 'system'
       primaryColor.value = data.primaryColor ?? 'blue'
       // 窗口材质由主进程启动时保证一定有值，无需兜底
@@ -935,6 +975,7 @@ async function saveSettings(): Promise<void> {
       avatar: avatarToSave,
       autoPaste: autoPaste.value,
       autoClear: autoClear.value,
+      autoBackToSearch: autoBackToSearch.value,
       theme: theme.value,
       primaryColor: primaryColor.value,
       customColor: customColor.value,

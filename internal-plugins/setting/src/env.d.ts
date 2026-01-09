@@ -119,6 +119,7 @@ declare global {
         updateAvatar: (avatar: string) => Promise<void>
         updateAutoPaste: (autoPaste: string) => Promise<void>
         updateAutoClear: (autoClear: string) => Promise<void>
+        updateAutoBackToSearch: (autoBackToSearch: string) => Promise<void>
         setTheme: (theme: string) => Promise<void>
         updatePrimaryColor: (primaryColor: string, customColor?: string) => Promise<void>
         setTrayIconVisible: (visible: boolean) => Promise<void>

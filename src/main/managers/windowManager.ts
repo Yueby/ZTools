@@ -44,6 +44,8 @@ class WindowManager {
   } | null = null // 打开应用前激活的窗口
   // private _shouldRestoreFocus = true // TODO: 是否在隐藏窗口时恢复焦点（待实现）
   private windowPositionsByDisplay: Record<number, { x: number; y: number }> = {}
+  private autoBackToSearchTimer: NodeJS.Timeout | null = null // 自动返回搜索定时器
+  private autoBackToSearchConfig: string = 'never' // 自动返回搜索配置
 
   /**
    * 获取鼠标所在显示器的工作区尺寸和位置
@@ -161,7 +163,7 @@ class WindowManager {
     })
 
     this.mainWindow.on('blur', () => {
-      this.mainWindow?.hide()
+      this.hideWindow(false)
     })
 
     this.mainWindow.on('show', () => {
@@ -436,6 +438,9 @@ class WindowManager {
   public showWindow(): void {
     if (!this.mainWindow) return
 
+    // 取消自动返回搜索定时器
+    this.cancelAutoBackToSearchTimer()
+
     // 记录打开窗口前的激活窗口
     const currentWindow = clipboardManager.getCurrentWindow()
     if (currentWindow) {
@@ -459,7 +464,98 @@ class WindowManager {
   public hideWindow(_restoreFocus: boolean = true): void {
     console.log('隐藏窗口', _restoreFocus)
     this.mainWindow?.hide()
-    this.restorePreviousWindow()
+    if (_restoreFocus) {
+      this.restorePreviousWindow()
+    }
+
+    // 启动自动返回搜索定时器
+    this.startAutoBackToSearchTimer()
+  }
+
+  /**
+   * 启动自动返回搜索定时器
+   */
+  private startAutoBackToSearchTimer(): void {
+    // 清除之前的定时器
+    if (this.autoBackToSearchTimer) {
+      clearTimeout(this.autoBackToSearchTimer)
+      this.autoBackToSearchTimer = null
+    }
+
+    // 如果配置为"从不"，不启动定时器
+    if (this.autoBackToSearchConfig === 'never') {
+      return
+    }
+
+    // 获取延时时间（毫秒）
+    const delay = this.getAutoBackToSearchDelay()
+    if (delay === 0) {
+      // 立即返回搜索
+      this.backToSearch()
+      return
+    }
+
+    // 启动定时器
+    this.autoBackToSearchTimer = setTimeout(() => {
+      this.backToSearch()
+      this.autoBackToSearchTimer = null
+    }, delay)
+
+    console.log(`自动返回搜索定时器已启动，延时: ${delay}ms`)
+  }
+
+  /**
+   * 取消自动返回搜索定时器
+   */
+  private cancelAutoBackToSearchTimer(): void {
+    if (this.autoBackToSearchTimer) {
+      clearTimeout(this.autoBackToSearchTimer)
+      this.autoBackToSearchTimer = null
+      console.log('自动返回搜索定时器已取消')
+    }
+  }
+
+  /**
+   * 返回搜索界面
+   */
+  private backToSearch(): void {
+    if (!this.mainWindow) return
+
+    pluginManager.hidePluginView()
+    // 通知渲染进程返回搜索
+    this.mainWindow.webContents.send('back-to-search')
+    console.log('已触发自动返回搜索')
+  }
+
+  /**
+   * 获取自动返回搜索的延时时间（毫秒）
+   */
+  private getAutoBackToSearchDelay(): number {
+    switch (this.autoBackToSearchConfig) {
+      case 'immediately':
+        return 0
+      case '30s':
+        return 30 * 1000
+      case '1m':
+        return 60 * 1000
+      case '3m':
+        return 3 * 60 * 1000
+      case '5m':
+        return 5 * 60 * 1000
+      case '10m':
+        return 10 * 60 * 1000
+      case 'never':
+      default:
+        return -1 // 不启动定时器
+    }
+  }
+
+  /**
+   * 更新自动返回搜索配置
+   */
+  public async updateAutoBackToSearch(config: string): Promise<void> {
+    this.autoBackToSearchConfig = config
+    console.log('更新自动返回搜索配置:', config)
   }
 
   /**
@@ -588,7 +684,6 @@ class WindowManager {
       }
 
       this.applyMaterial(material)
-
     } catch (error) {
       console.error('读取窗口材质配置失败，使用默认值:', error)
       const defaultMaterial = getDefaultWindowMaterial()
