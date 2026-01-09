@@ -30,6 +30,8 @@ window.ztools = {
   getNativeId: () => electron.ipcRenderer.sendSync('get-native-id'),
   // 获取应用版本号
   getAppVersion: () => electron.ipcRenderer.sendSync('get-app-version'),
+  // 获取窗口类型
+  getWindowType: () => electron.ipcRenderer.sendSync('get-window-type'),
   // 是否深色主题
   isDarkColors: () => electron.ipcRenderer.sendSync('is-dark-colors'),
   sendInputEvent: async (event) => await electron.ipcRenderer.invoke('send-input-event', event),

@@ -1,15 +1,18 @@
 import { ipcMain, webContents } from 'electron'
 import pluginWindowManager from '../../core/pluginWindowManager.js'
 import windowManager from '../../managers/windowManager.js'
+import detachedWindowManager from '../../core/detachedWindowManager.js'
 
 /**
  * 插件独立窗口管理API - 插件专用
  */
 export class PluginWindowAPI {
   private pluginManager: any = null
+  private mainWindow: Electron.BrowserWindow | null = null
 
-  public init(_mainWindow: Electron.BrowserWindow, pluginManager: any): void {
+  public init(mainWindow: Electron.BrowserWindow, pluginManager: any): void {
     this.pluginManager = pluginManager
+    this.mainWindow = mainWindow
     this.setupIPC()
   }
 
@@ -96,6 +99,42 @@ export class PluginWindowAPI {
         console.error('转发消息失败:', error)
       }
     })
+
+    // 获取窗口类型（同步方法，供插件使用）
+    ipcMain.on('get-window-type', (event) => {
+      try {
+        const windowType = this.getWindowType(event.sender)
+        event.returnValue = windowType
+      } catch (error) {
+        console.error('get-window-type error:', error)
+        event.returnValue = 'main' // 默认返回 main
+      }
+    })
+  }
+
+  /**
+   * 获取窗口类型
+   * @param webContents 调用者的 WebContents
+   * @returns 'main' | 'detach' | 'browser'
+   */
+  private getWindowType(webContents: Electron.WebContents): 'main' | 'detach' | 'browser' {
+    // 检查是否是主窗口
+    if (this.mainWindow && webContents.id === this.mainWindow.webContents.id) {
+      return 'main'
+    }
+
+    // 检查是否是分离窗口
+    if (detachedWindowManager.isDetachedWindow(webContents)) {
+      return 'detach'
+    }
+
+    // 检查是否是 browser 窗口
+    if (pluginWindowManager.isBrowserWindow(webContents)) {
+      return 'browser'
+    }
+
+    // 默认返回 main（可能是插件的 WebContentsView）
+    return 'main'
   }
 }
 

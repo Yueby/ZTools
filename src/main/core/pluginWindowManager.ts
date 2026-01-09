@@ -323,6 +323,18 @@ class PluginWindowManager {
   }
 
   /**
+   * 检查 WebContents 是否属于 browser 窗口
+   */
+  public isBrowserWindow(webContents: Electron.WebContents): boolean {
+    for (const windowInfo of Array.from(this.windowInfoMap.values())) {
+      if (!windowInfo.window.isDestroyed() && windowInfo.window.webContents.id === webContents.id) {
+        return true
+      }
+    }
+    return false
+  }
+
+  /**
    * 关闭所有窗口
    */
   public closeAll(): void {

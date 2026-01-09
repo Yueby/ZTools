@@ -504,6 +504,23 @@ class DetachedWindowManager {
   }
 
   /**
+   * 检查 WebContents 是否属于分离窗口
+   */
+  public isDetachedWindow(webContents: Electron.WebContents): boolean {
+    for (const info of Array.from(this.detachedWindowMap.values())) {
+      // 检查窗口的主 WebContents
+      if (!info.window.isDestroyed() && info.window.webContents.id === webContents.id) {
+        return true
+      }
+      // 检查插件视图的 WebContents
+      if (!info.view.webContents.isDestroyed() && info.view.webContents.id === webContents.id) {
+        return true
+      }
+    }
+    return false
+  }
+
+  /**
    * 广播消息到所有分离窗口
    */
   public broadcastToAllWindows(channel: string, ...args: any[]): void {
