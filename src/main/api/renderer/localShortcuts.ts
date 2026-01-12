@@ -81,7 +81,9 @@ export class LocalShortcutsAPI {
 
   private setupIPC(): void {
     ipcMain.handle('local-shortcuts:get-all', () => this.getAllShortcuts())
-    ipcMain.handle('local-shortcuts:add', () => this.addShortcut())
+    ipcMain.handle('local-shortcuts:add', (_event, type: 'file' | 'folder') =>
+      this.addShortcut(type)
+    )
     ipcMain.handle('local-shortcuts:add-by-path', (_event, filePath: string) =>
       this.addShortcutByPath(filePath)
     )
@@ -107,25 +109,27 @@ export class LocalShortcutsAPI {
   /**
    * 添加本地启动项（通过文件选择对话框）
    */
-  private async addShortcut(): Promise<{ success: boolean; error?: string }> {
+  private async addShortcut(
+    type: 'file' | 'folder'
+  ): Promise<{ success: boolean; error?: string }> {
     try {
       if (!this.mainWindow) {
         return { success: false, error: '主窗口未初始化' }
       }
 
+      // 根据类型设置对话框属性
+      let properties: Array<'openFile' | 'openDirectory'>
+      if (type === 'folder') {
+        // 只选择文件夹
+        properties = ['openDirectory']
+      } else {
+        properties = ['openFile']
+      }
+
       // 打开文件选择对话框
       const result = await dialog.showOpenDialog(this.mainWindow, {
-        title: '选择文件、文件夹或应用',
-        properties: ['openFile', 'openDirectory'],
-        filters:
-          process.platform === 'win32'
-            ? [
-                { name: '所有文件', extensions: ['*'] },
-                { name: '可执行文件', extensions: ['exe', 'lnk'] }
-              ]
-            : process.platform === 'darwin'
-              ? [{ name: '所有文件', extensions: ['*', 'app'] }]
-              : [{ name: '所有文件', extensions: ['*'] }]
+        title: type === 'folder' ? '选择文件夹' : '选择文件或应用',
+        properties
       })
 
       if (result.canceled || result.filePaths.length === 0) {
@@ -141,13 +145,13 @@ export class LocalShortcutsAPI {
       const fileName = path.parse(baseNameWithExt).name
 
       // 判断类型
-      let type: 'file' | 'folder' | 'app'
+      let itemType: 'file' | 'folder' | 'app'
       if (stats.isDirectory()) {
         // 检查是否为 macOS 应用
         if (process.platform === 'darwin' && selectedPath.endsWith('.app')) {
-          type = 'app'
+          itemType = 'app'
         } else {
-          type = 'folder'
+          itemType = 'folder'
         }
       } else {
         // Windows 可执行文件或快捷方式视为应用
@@ -155,15 +159,15 @@ export class LocalShortcutsAPI {
           process.platform === 'win32' &&
           (selectedPath.endsWith('.exe') || selectedPath.endsWith('.lnk'))
         ) {
-          type = 'app'
+          itemType = 'app'
         } else {
-          type = 'file'
+          itemType = 'file'
         }
       }
 
       // 获取文件图标
       let icon: string | undefined
-      if (type === 'app') {
+      if (itemType === 'app') {
         // 应用程序使用 ztools-icon:// 协议（与系统应用扫描器一致）
         if (process.platform === 'darwin') {
           // macOS: 提取 .app 内部的 .icns 图标文件路径
@@ -173,7 +177,7 @@ export class LocalShortcutsAPI {
           // Windows: 直接使用 .exe 或 .lnk 路径
           icon = `ztools-icon://${encodeURIComponent(selectedPath)}`
         }
-      } else if (type === 'folder' && process.platform === 'win32') {
+      } else if (itemType === 'folder' && process.platform === 'win32') {
         // Windows 文件夹：使用 ztools-icon:// 协议获取系统文件夹图标
         icon = `ztools-icon://${encodeURIComponent(selectedPath)}`
       } else {
@@ -197,7 +201,7 @@ export class LocalShortcutsAPI {
         id: `local-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
         name: fileName,
         path: selectedPath,
-        type,
+        type: itemType,
         icon,
         keywords: [fileName],
         pinyin: pinyinFull,
@@ -246,13 +250,13 @@ export class LocalShortcutsAPI {
       const fileName = path.parse(baseNameWithExt).name
 
       // 判断类型
-      let type: 'file' | 'folder' | 'app'
+      let itemType: 'file' | 'folder' | 'app'
       if (stats.isDirectory()) {
         // 检查是否为 macOS 应用
         if (process.platform === 'darwin' && selectedPath.endsWith('.app')) {
-          type = 'app'
+          itemType = 'app'
         } else {
-          type = 'folder'
+          itemType = 'folder'
         }
       } else {
         // Windows 可执行文件或快捷方式视为应用
@@ -260,15 +264,15 @@ export class LocalShortcutsAPI {
           process.platform === 'win32' &&
           (selectedPath.endsWith('.exe') || selectedPath.endsWith('.lnk'))
         ) {
-          type = 'app'
+          itemType = 'app'
         } else {
-          type = 'file'
+          itemType = 'file'
         }
       }
 
       // 获取文件图标
       let icon: string | undefined
-      if (type === 'app') {
+      if (itemType === 'app') {
         // 应用程序使用 ztools-icon:// 协议（与系统应用扫描器一致）
         if (process.platform === 'darwin') {
           // macOS: 提取 .app 内部的 .icns 图标文件路径
@@ -278,7 +282,7 @@ export class LocalShortcutsAPI {
           // Windows: 直接使用 .exe 或 .lnk 路径
           icon = `ztools-icon://${encodeURIComponent(selectedPath)}`
         }
-      } else if (type === 'folder' && process.platform === 'win32') {
+      } else if (itemType === 'folder' && process.platform === 'win32') {
         // Windows 文件夹：使用 ztools-icon:// 协议获取系统文件夹图标
         icon = `ztools-icon://${encodeURIComponent(selectedPath)}`
       } else {
@@ -302,7 +306,7 @@ export class LocalShortcutsAPI {
         id: `local-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
         name: fileName,
         path: selectedPath,
-        type,
+        type: itemType,
         icon,
         keywords: [fileName],
         pinyin: pinyinFull,

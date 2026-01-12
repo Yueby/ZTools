@@ -273,7 +273,7 @@ declare global {
             addedAt: number
           }>
         >
-        add: () => Promise<{ success: boolean; error?: string }>
+        add: (type: 'file' | 'folder') => Promise<{ success: boolean; error?: string }>
         delete: (id: string) => Promise<{ success: boolean; error?: string }>
         open: (path: string) => Promise<{ success: boolean; error?: string }>
       }

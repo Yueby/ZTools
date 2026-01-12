@@ -346,7 +346,7 @@ window.ztools = {
     // ==================== 本地启动管理 API ====================
     localShortcuts: {
       getAll: async () => await electron.ipcRenderer.invoke('local-shortcuts:get-all'),
-      add: async () => await electron.ipcRenderer.invoke('local-shortcuts:add'),
+      add: async (type) => await electron.ipcRenderer.invoke('local-shortcuts:add', type),
       addByPath: async (filePath) =>
         await electron.ipcRenderer.invoke('local-shortcuts:add-by-path', filePath),
       delete: async (id) => await electron.ipcRenderer.invoke('local-shortcuts:delete', id),

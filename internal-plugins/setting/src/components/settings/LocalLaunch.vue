@@ -31,8 +31,11 @@
     >
       <div class="panel-header">
         <div class="button-group">
-          <button class="btn btn-primary" :disabled="isAdding" @click="handleAdd">
-            {{ isAdding ? '添加中...' : '添加项目' }}
+          <button class="btn btn-primary" :disabled="isAdding" @click="handleAdd('file')">
+            {{ isAdding ? '添加中...' : '添加文件' }}
+          </button>
+          <button class="btn btn-primary" :disabled="isAdding" @click="handleAdd('folder')">
+            {{ isAdding ? '添加中...' : '添加文件夹' }}
           </button>
         </div>
       </div>
@@ -54,7 +57,7 @@
           <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
         </svg>
         <div class="empty-text">暂无本地启动项</div>
-        <div class="empty-hint">拖拽文件、文件夹或应用到此处，或点击上方"添加项目"按钮</div>
+        <div class="empty-hint">拖拽文件、文件夹或应用到此处，或点击上方按钮添加</div>
       </div>
 
       <!-- 本地启动项列表 -->
@@ -182,12 +185,12 @@ async function loadShortcuts(): Promise<void> {
 }
 
 // 添加项目
-async function handleAdd(): Promise<void> {
+async function handleAdd(type: 'file' | 'folder'): Promise<void> {
   if (isAdding.value) return
 
   isAdding.value = true
   try {
-    const result = await window.ztools.internal.localShortcuts.add()
+    const result = await window.ztools.internal.localShortcuts.add(type)
     if (result.success) {
       success('添加成功')
       await loadShortcuts()

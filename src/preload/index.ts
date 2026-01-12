@@ -228,7 +228,7 @@ const api = {
   // 本地启动管理
   localShortcuts: {
     getAll: () => ipcRenderer.invoke('local-shortcuts:get-all'),
-    add: () => ipcRenderer.invoke('local-shortcuts:add'),
+    add: (type: 'file' | 'folder') => ipcRenderer.invoke('local-shortcuts:add', type),
     delete: (id: string) => ipcRenderer.invoke('local-shortcuts:delete', id),
     open: (path: string) => ipcRenderer.invoke('local-shortcuts:open', path)
   },
