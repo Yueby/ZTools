@@ -136,7 +136,9 @@ export class LocalShortcutsAPI {
 
       // 获取文件信息
       const stats = await fs.stat(selectedPath)
-      const fileName = path.basename(selectedPath)
+      const baseNameWithExt = path.basename(selectedPath)
+      // 去掉后缀名
+      const fileName = path.parse(baseNameWithExt).name
 
       // 判断类型
       let type: 'file' | 'folder' | 'app'
@@ -239,7 +241,9 @@ export class LocalShortcutsAPI {
     try {
       // 获取文件信息
       const stats = await fs.stat(selectedPath)
-      const fileName = path.basename(selectedPath)
+      const baseNameWithExt = path.basename(selectedPath)
+      // 去掉后缀名
+      const fileName = path.parse(baseNameWithExt).name
 
       // 判断类型
       let type: 'file' | 'folder' | 'app'
