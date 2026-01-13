@@ -251,11 +251,7 @@ async function fetchContent(url: string): Promise<string> {
   // console.log('fetchContent response:', response)
 
   // 检查反爬虫保护
-  if (
-    response.data &&
-    typeof response.data === 'string' &&
-    response.data.includes('document.location.reload()')
-  ) {
+  if (response.data && typeof response.data === 'string' && !response.data.includes('<body>')) {
     console.log('触发反爬虫保护，正在解密 Cookie...')
     try {
       const targetHost = new URL(url).host
@@ -309,31 +305,89 @@ function getAcwCookie(htmlContent: string, targetHost: string): CookieResult {
   let jsCode = scriptMatch[1]
 
   // 2. 创建最小化的浏览器环境模拟
-  const mockEnv = {
-    document: {
-      cookie: ''
-    },
-    location: {
-      host: targetHost,
-      reload: function () {
-        // 空实现，不需要真的刷新
+  const accessLog: string[] = []
+
+  // 创建代理辅助函数，用于递归代理嵌套对象
+  function createProxy(target: any, path: string): any {
+    return new Proxy(target, {
+      get(obj, prop) {
+        const fullPath = path ? `${path}.${String(prop)}` : String(prop)
+        const value = obj[prop]
+
+        // 记录访问日志
+        if (typeof value === 'function') {
+          accessLog.push(`[调用函数] ${fullPath}()`)
+        } else {
+          accessLog.push(`[访问属性] ${fullPath}`)
+        }
+
+        // 如果是函数，返回代理包装的函数
+        if (typeof value === 'function') {
+          return new Proxy(value, {
+            apply(target, thisArg, args) {
+              accessLog.push(
+                `[执行函数] ${fullPath}(${args.map((a) => JSON.stringify(a).slice(0, 50)).join(', ')})`
+              )
+              return Reflect.apply(target, thisArg, args)
+            }
+          })
+        }
+
+        // 如果是对象（但不是内置对象），递归代理
+        if (value && typeof value === 'object' && !Array.isArray(value)) {
+          // 排除内置对象（Date、Math、RegExp 等）
+          if (
+            value.constructor &&
+            ['Date', 'Math', 'RegExp', 'String', 'Number', 'Boolean'].includes(
+              value.constructor.name
+            )
+          ) {
+            return value
+          }
+          return createProxy(value, fullPath)
+        }
+
+        return value
+      },
+      set(obj, prop, value) {
+        const fullPath = path ? `${path}.${String(prop)}` : String(prop)
+        accessLog.push(`[设置属性] ${fullPath} = ${JSON.stringify(value).slice(0, 100)}`)
+        obj[prop] = value
+        return true
       }
-    },
-    // Node.js原生支持的对象
-    Date: Date,
-    Math: Math,
-    RegExp: RegExp,
-    String: String,
-    parseInt: parseInt,
-    decodeURIComponent: decodeURIComponent,
-    // atob的Node.js实现
-    atob: function (str: string) {
-      return Buffer.from(str, 'base64').toString('binary')
-    }
+    })
   }
 
-  // 3. 移除页面刷新代码
-  jsCode = jsCode.replace('document.location.reload()', '')
+  const mockEnv = createProxy(
+    {
+      document: {
+        cookie: '',
+        location: {
+          reload: function () {
+            // 空实现
+          }
+        }
+      },
+      location: {
+        host: targetHost,
+        reload: function () {
+          // 空实现，不需要真的刷新
+        }
+      },
+      // Node.js原生支持的对象
+      Date: Date,
+      Math: Math,
+      RegExp: RegExp,
+      String: String,
+      parseInt: parseInt,
+      decodeURIComponent: decodeURIComponent,
+      // atob的Node.js实现
+      atob: function (str: string) {
+        return Buffer.from(str, 'base64').toString('binary')
+      }
+    },
+    'mockEnv'
+  )
 
   // 修复反爬虫检测：替换函数定义以匹配正则检查
   // 原代码中的正则检查非常严格，要求 function (){return 而不是 function () { return
@@ -387,9 +441,21 @@ function getAcwCookie(htmlContent: string, targetHost: string): CookieResult {
       }
     }
   } catch (e: any) {
+    console.log('执行错误', e)
     return {
       success: false,
       error: `执行错误: ${e.message}`
     }
+  } finally {
+    // 无论成功还是失败，都打印访问日志
+    // console.log('\n========== mockEnv 访问日志 ==========')
+    // if (accessLog.length === 0) {
+    //   console.log('(无访问记录)')
+    // } else {
+    //   accessLog.forEach((log, index) => {
+    //     console.log(`${index + 1}. ${log}`)
+    //   })
+    // }
+    // console.log('========== 访问日志结束 ==========\n')
   }
 }
