@@ -84,10 +84,12 @@ const props = withDefaults(
     selectedIndex: number
     emptyText?: string
     draggable?: boolean
+    searchQuery?: string // 搜索查询（用于 acronym 高亮）
   }>(),
   {
     emptyText: '',
-    draggable: false
+    draggable: false,
+    searchQuery: ''
   }
 )
 
@@ -161,7 +163,7 @@ watch(
 )
 
 function getHighlightedName(app: Command): string {
-  return highlightMatch(app.name, app.matches)
+  return highlightMatch(app.name, app.matches, app.matchType, props.searchQuery)
 }
 
 // 记录图标加载失败的应用

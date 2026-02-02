@@ -17,6 +17,7 @@
         :selected-index="selectedIndex"
         :empty-text="emptyText"
         :draggable="draggable"
+        :search-query="searchQuery"
         @select="$emit('select', $event)"
         @contextmenu="$emit('contextmenu', $event)"
         @update:apps="handleAppsUpdate"
@@ -39,6 +40,7 @@ interface Props {
   expanded?: MaybeRefOrGetter<boolean> // 是否展开（v-model）
   itemsPerRow?: number // 每行显示数量
   defaultVisibleRows?: number // 默认显示的行数（折叠时）
+  searchQuery?: string // 搜索查询（用于 acronym 高亮）
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -47,7 +49,8 @@ const props = withDefaults(defineProps<Props>(), {
   draggable: false,
   expanded: false,
   itemsPerRow: 9,
-  defaultVisibleRows: 1 // 默认显示1行
+  defaultVisibleRows: 1, // 默认显示1行
+  searchQuery: ''
 })
 
 const emit = defineEmits<{

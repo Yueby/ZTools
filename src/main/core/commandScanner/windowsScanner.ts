@@ -1,6 +1,7 @@
 import { shell } from 'electron'
 import fsPromises from 'fs/promises'
 import path from 'path'
+import { extractAcronym } from '../../utils/common'
 import { getWindowsStartMenuPaths } from '../../utils/systemPaths'
 import { Command } from './types'
 
@@ -162,7 +163,8 @@ async function scanDirectory(dirPath: string, apps: Command[]): Promise<void> {
       const app: Command = {
         name: appName,
         path: appPath,
-        icon
+        icon,
+        acronym: extractAcronym(appName)
       }
 
       apps.push(app)

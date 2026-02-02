@@ -61,6 +61,7 @@ export interface Command {
   icon?: string
   pinyin?: string
   pinyinAbbr?: string
+  acronym?: string // 英文首字母缩写（用于搜索）
   type: CommandType // 指令类型
   subType?: CommandSubType // 子类型（用于区分 direct 类型）
   featureCode?: string // 插件功能代码（用于启动时指定功能）
@@ -69,6 +70,7 @@ export interface Command {
   matchCmd?: MatchCmd // 匹配指令配置（regex 或 over 或 img 或 files）
   cmdType?: 'text' | 'regex' | 'over' | 'img' | 'files' // cmd类型
   matches?: MatchInfo[] // 搜索匹配信息（用于高亮显示）
+  matchType?: 'acronym' | 'name' | 'pinyin' | 'pinyinAbbr' // 匹配类型（用于高亮算法选择）
   // 系统设置字段（新增）
   settingUri?: string // ms-settings URI
   category?: string // 分类（用于分组显示）
@@ -482,7 +484,8 @@ export const useCommandDataStore = defineStore('commandData', () => {
         keys: [
           { name: 'name', weight: 2 }, // 名称权重最高
           { name: 'pinyin', weight: 1.5 }, // 拼音
-          { name: 'pinyinAbbr', weight: 1 } // 拼音首字母
+          { name: 'pinyinAbbr', weight: 1 }, // 拼音首字母
+          { name: 'acronym', weight: 1.5 } // 英文首字母缩写
         ],
         threshold: 0, // 严格模式
         ignoreLocation: true,
@@ -564,7 +567,8 @@ export const useCommandDataStore = defineStore('commandData', () => {
           keys: [
             { name: 'name', weight: 2 },
             { name: 'pinyin', weight: 1.5 },
-            { name: 'pinyinAbbr', weight: 1 }
+            { name: 'pinyinAbbr', weight: 1 },
+            { name: 'acronym', weight: 1.5 }
           ],
           threshold: 0,
           ignoreLocation: true,
@@ -575,11 +579,29 @@ export const useCommandDataStore = defineStore('commandData', () => {
 
     const fuseResults = searchFuse.search(query)
     const bestMatches = fuseResults
-      .map((r) => ({
-        ...r.item,
-        matches: r.matches as MatchInfo[],
-        _score: r.score || 0
-      }))
+      .map((r) => {
+        // 检测匹配类型（用于前端高亮算法选择）
+        let matchType: 'acronym' | 'name' | 'pinyin' | 'pinyinAbbr' | undefined
+        if (r.matches && r.matches.length > 0) {
+          // 优先级：acronym > name > pinyin > pinyinAbbr
+          if (r.matches.some((m) => m.key === 'acronym')) {
+            matchType = 'acronym'
+          } else if (r.matches.some((m) => m.key === 'name')) {
+            matchType = 'name'
+          } else if (r.matches.some((m) => m.key === 'pinyin')) {
+            matchType = 'pinyin'
+          } else if (r.matches.some((m) => m.key === 'pinyinAbbr')) {
+            matchType = 'pinyinAbbr'
+          }
+        }
+
+        return {
+          ...r.item,
+          matches: r.matches as MatchInfo[],
+          matchType,
+          _score: r.score || 0
+        }
+      })
       .sort((a, b) => {
         // 自定义排序：优先连续匹配
         const scoreA = calculateMatchScore(a.name, query, a.matches)

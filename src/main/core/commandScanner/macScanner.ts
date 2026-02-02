@@ -4,6 +4,7 @@ import fs from 'fs/promises'
 import path from 'path'
 import plist from 'simple-plist'
 import { promisify } from 'util'
+import { extractAcronym } from '../../utils/common'
 import { Command } from './types'
 import { pLimit } from './utils'
 
@@ -104,15 +105,18 @@ export async function scanApplications(): Promise<Command[]> {
         return {
           name,
           path: appPath,
-          icon: iconUrl
+          icon: iconUrl,
+          acronym: extractAcronym(name)
         }
       } catch {
         const defaultIconPath =
           '/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/GenericApplicationIcon.icns'
+        const name = path.basename(appPath, '.app')
         return {
-          name: path.basename(appPath, '.app'),
+          name,
           path: appPath,
-          icon: `ztools-icon://${encodeURIComponent(defaultIconPath)}`
+          icon: `ztools-icon://${encodeURIComponent(defaultIconPath)}`,
+          acronym: extractAcronym(name)
         }
       }
     })

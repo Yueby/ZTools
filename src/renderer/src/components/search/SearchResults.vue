@@ -56,6 +56,7 @@
         :empty-text="'未找到应用'"
         :default-visible-rows="2"
         :draggable="false"
+        :search-query="searchQuery"
         @select="handleSelectApp"
         @contextmenu="(app) => handleAppContextMenu(app, true)"
       />
@@ -70,6 +71,7 @@
         :empty-text="''"
         :default-visible-rows="2"
         :draggable="false"
+        :search-query="searchQuery"
         @select="handleSelectApp"
         @contextmenu="(app) => handleAppContextMenu(app, true)"
       />
@@ -83,6 +85,7 @@
         :empty-text="''"
         :default-visible-rows="2"
         :draggable="false"
+        :search-query="searchQuery"
         @select="handleRecommendationSelect"
       />
     </div>

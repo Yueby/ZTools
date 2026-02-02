@@ -10,11 +10,23 @@ interface MatchInfo {
  * 根据匹配信息高亮文本
  * @param text 原始文本
  * @param matches Fuse.js 返回的匹配信息
+ * @param matchType 匹配类型（用于特殊高亮算法）
+ * @param query 搜索查询（用于 acronym 匹配）
  * @returns 包含高亮标签的HTML字符串
  */
-export function highlightMatch(text: string, matches?: MatchInfo[]): string {
+export function highlightMatch(
+  text: string,
+  matches?: MatchInfo[],
+  matchType?: 'acronym' | 'name' | 'pinyin' | 'pinyinAbbr',
+  query?: string
+): string {
   if (!matches || matches.length === 0) {
     return escapeHtml(text)
+  }
+
+  // 特殊处理：acronym 匹配类型
+  if (matchType === 'acronym' && query) {
+    return highlightAcronym(text, query)
   }
 
   // 收集所有需要高亮的字符索引
@@ -78,6 +90,73 @@ export function highlightMatch(text: string, matches?: MatchInfo[]): string {
 
   // 添加剩余部分
   result += escapeHtml(text.substring(lastIndex))
+
+  return result
+}
+
+/**
+ * 高亮首字母缩写匹配
+ * @param text 原始文本（如 "Visual Studio Code"）
+ * @param query 搜索查询（如 "vs"）
+ * @returns 包含高亮标签的HTML字符串
+ */
+function highlightAcronym(text: string, query: string): string {
+  const highlightIndices = new Set<number>()
+
+  // 方式1：空格分隔的单词首字母
+  const words = text.split(/\s+/).filter((w) => w.length > 0)
+  if (words.length > 1) {
+    let currentIndex = 0
+    let highlightCount = 0
+
+    for (const word of words) {
+      // 找到单词在原文中的位置
+      const wordIndex = text.indexOf(word, currentIndex)
+      if (wordIndex !== -1 && highlightCount < query.length) {
+        // 高亮该单词的首字母
+        highlightIndices.add(wordIndex)
+        highlightCount++
+        currentIndex = wordIndex + word.length
+      }
+    }
+
+    if (highlightIndices.size > 0) {
+      return buildHighlightedText(text, highlightIndices)
+    }
+  }
+
+  // 方式2：驼峰命名首字母
+  const chars = Array.from(text)
+  let highlightCount = 0
+
+  for (let i = 0; i < chars.length && highlightCount < query.length; i++) {
+    if (/[A-Z]/.test(chars[i])) {
+      highlightIndices.add(i)
+      highlightCount++
+    }
+  }
+
+  return buildHighlightedText(text, highlightIndices)
+}
+
+/**
+ * 根据索引集合构建高亮文本
+ */
+function buildHighlightedText(text: string, highlightIndices: Set<number>): string {
+  if (highlightIndices.size === 0) {
+    return escapeHtml(text)
+  }
+
+  let result = ''
+  const chars = Array.from(text)
+
+  for (let i = 0; i < chars.length; i++) {
+    if (highlightIndices.has(i)) {
+      result += '<mark class="highlight">' + escapeHtml(chars[i]) + '</mark>'
+    } else {
+      result += escapeHtml(chars[i])
+    }
+  }
 
   return result
 }
