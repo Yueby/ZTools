@@ -25,6 +25,9 @@ export type AutoPasteOption = 'off' | '1s' | '3s' | '5s' | '10s'
 // 自动清空选项
 export type AutoClearOption = 'immediately' | '1m' | '2m' | '3m' | '5m' | '10m' | 'never'
 
+// 搜索框模式选项
+export type SearchMode = 'aggregate' | 'list'
+
 // 更新下载状态
 interface UpdateDownloadInfo {
   hasDownloaded: boolean
@@ -59,6 +62,8 @@ export const useWindowStore = defineStore('window', () => {
   const recentRows = ref(2)
   // 固定栏显示行数
   const pinnedRows = ref(2)
+  // 搜索框模式
+  const searchMode = ref<SearchMode>('aggregate')
 
   const theme = ref('system') // system, light, dark
   const primaryColor = ref('blue') // blue, purple, green, orange, red, pink, custom
@@ -166,6 +171,10 @@ export const useWindowStore = defineStore('window', () => {
 
   function updatePinnedRows(rows: number): void {
     pinnedRows.value = rows
+  }
+
+  function updateSearchMode(mode: SearchMode): void {
+    searchMode.value = mode
   }
 
   function updateTheme(value: string): void {
@@ -468,6 +477,9 @@ export const useWindowStore = defineStore('window', () => {
         if (data.pinnedRows) {
           pinnedRows.value = data.pinnedRows
         }
+        if (data.searchMode) {
+          searchMode.value = data.searchMode
+        }
       } else {
         // 默认蓝色
         updatePrimaryColor('blue')
@@ -516,6 +528,8 @@ export const useWindowStore = defineStore('window', () => {
     pinnedRows,
     updateRecentRows,
     updatePinnedRows,
+    searchMode,
+    updateSearchMode,
     updateTheme,
     updatePrimaryColor,
     updateCustomColor,

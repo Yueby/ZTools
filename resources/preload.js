@@ -450,6 +450,9 @@ window.ztools = {
     // 通知主渲染进程更新固定栏行数
     updatePinnedRows: async (rows) =>
       await electron.ipcRenderer.invoke('internal:update-pinned-rows', rows),
+    // 通知主渲染进程更新搜索框模式
+    updateSearchMode: async (mode) =>
+      await electron.ipcRenderer.invoke('internal:update-search-mode', mode),
     // 通知主渲染进程更新主题色
     updatePrimaryColor: async (primaryColor, customColor) =>
       await electron.ipcRenderer.invoke('internal:update-primary-color', primaryColor, customColor),

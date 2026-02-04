@@ -287,8 +287,19 @@
       </div>
     </div>
 
+    <!-- 搜索框模式设置 -->
+    <div class="setting-item">
+      <div class="setting-label">
+        <span>搜索框模式</span>
+        <span class="setting-desc">选择搜索框的显示模式</span>
+      </div>
+      <div class="setting-control">
+        <Dropdown v-model="searchMode" :options="searchModeOptions" @change="handleSearchModeChange" />
+      </div>
+    </div>
+
     <!-- 最近使用行数设置 -->
-    <div v-if="showRecentInSearch" class="setting-item sub-setting">
+    <div v-if="showRecentInSearch && searchMode === 'aggregate'" class="setting-item">
       <div class="setting-label">
         <span>最近使用显示行数</span>
         <span class="setting-desc">设置最近使用列表显示的行数（每行9个）</span>
@@ -303,7 +314,7 @@
     </div>
 
     <!-- 固定栏行数设置 -->
-    <div class="setting-item">
+    <div v-if="searchMode === 'aggregate'" class="setting-item">
       <div class="setting-label">
         <span>固定栏显示行数</span>
         <span class="setting-desc">设置已固定应用列表显示的行数（每行9个）</span>
@@ -506,6 +517,11 @@ const pinnedRowsOptions = [
   { label: '4行', value: 4 }
 ]
 
+const searchModeOptions = [
+  { label: '聚合模式', value: 'aggregate' },
+  { label: '列表模式', value: 'list' }
+]
+
 // 当前平台（与 window.ztools.getPlatform 返回类型保持一致）
 const platform = ref<'darwin' | 'win32' | 'linux'>('darwin')
 
@@ -525,6 +541,7 @@ const autoBackToSearch = ref<AutoBackToSearchOption>('never')
 const showRecentInSearch = ref(true)
 const recentRows = ref(2)
 const pinnedRows = ref(2)
+const searchMode = ref<'aggregate' | 'list'>('aggregate')
 
 // 实际快捷键字符串
 const hotkey = ref('')
@@ -793,6 +810,18 @@ async function handlePinnedRowsChange(): Promise<void> {
     console.log('固定栏行数已更新:', pinnedRows.value)
   } catch (error) {
     console.error('保存固定栏行数配置失败:', error)
+  }
+}
+
+// 处理搜索框模式变化
+async function handleSearchModeChange(): Promise<void> {
+  try {
+    await saveSettings()
+    // 通知主渲染进程更新
+    await window.ztools.internal.updateSearchMode(searchMode.value)
+    console.log('搜索框模式已更新:', searchMode.value)
+  } catch (error) {
+    console.error('保存搜索框模式配置失败:', error)
   }
 }
 
@@ -1200,6 +1229,7 @@ async function loadSettings(): Promise<void> {
       pinnedRows.value = data.pinnedRows ?? 2
       theme.value = data.theme ?? 'system'
       primaryColor.value = data.primaryColor ?? 'blue'
+      searchMode.value = data.searchMode ?? 'aggregate'
       // 窗口材质由主进程启动时保证一定有值，无需兜底
       windowMaterial.value = data.windowMaterial
       acrylicLightOpacity.value = data.acrylicLightOpacity ?? 78
@@ -1255,6 +1285,7 @@ async function saveSettings(): Promise<void> {
       showRecentInSearch: showRecentInSearch.value,
       recentRows: recentRows.value,
       pinnedRows: pinnedRows.value,
+      searchMode: searchMode.value,
       theme: theme.value,
       primaryColor: primaryColor.value,
       customColor: customColor.value,

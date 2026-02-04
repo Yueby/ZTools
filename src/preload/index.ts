@@ -146,6 +146,9 @@ const api = {
   onUpdatePinnedRows: (callback: (rows: number) => void) => {
     ipcRenderer.on('update-pinned-rows', (_event, rows) => callback(rows))
   },
+  onUpdateSearchMode: (callback: (mode: string) => void) => {
+    ipcRenderer.on('update-search-mode', (_event, mode) => callback(mode))
+  },
   onUpdatePrimaryColor: (
     callback: (data: { primaryColor: string; customColor?: string }) => void
   ) => {

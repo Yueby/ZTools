@@ -549,6 +549,11 @@ onMounted(async () => {
     windowStore.updatePinnedRows(rows)
   })
 
+  // 监听搜索框模式更新事件
+  window.ztools.onUpdateSearchMode((mode: string) => {
+    windowStore.updateSearchMode(mode as 'aggregate' | 'list')
+  })
+
   // 监听主题色更新事件
   window.ztools.onUpdatePrimaryColor((data: { primaryColor: string; customColor?: string }) => {
     console.log('更新主题色:', data)
