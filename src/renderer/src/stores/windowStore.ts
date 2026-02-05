@@ -5,14 +5,14 @@ import defaultAvatar from '../assets/image/default.png'
 interface WindowInfo {
   title?: string
   app: string // 应用名称（如 "Finder.app"）
-  bundleId: string
+  bundleId?: string
   appPath?: string
   pid?: number
   x?: number
   y?: number
   width?: number
   height?: number
-  timestamp: number
+  timestamp?: number
 }
 
 interface PluginInfo {

@@ -47,6 +47,7 @@ export async function loadInternalPlugins(): Promise<void> {
 
       const pluginInfo = {
         name: pluginConfig.name,
+        title: pluginConfig.title,
         version: pluginConfig.version,
         description: pluginConfig.description || '',
         logo: logoPath ? pathToFileURL(logoPath).href : '',

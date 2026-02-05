@@ -76,6 +76,7 @@ export interface Command {
   subType?: CommandSubType // 子类型（用于区分 direct 类型）
   featureCode?: string // 插件功能代码（用于启动时指定功能）
   pluginName?: string // 插件名称（仅插件类型有效）
+  pluginTitle?: string // 插件标题（仅插件类型有效）
   pluginExplain?: string // 插件功能说明
   matchCmd?: MatchCmd // 匹配指令配置（regex 或 over 或 img 或 files）
   cmdType?: 'text' | 'regex' | 'over' | 'img' | 'files' // cmd类型
@@ -375,6 +376,7 @@ export const useCommandDataStore = defineStore('commandData', () => {
           // 如果已经有同名的 feature cmd，则跳过插件名称指令，避免重复
           if (!hasPluginNameCmd) {
             let defaultFeatureCode: string | undefined = undefined
+            let defaultFeatureExplain: string | undefined = undefined
             // 如果插件没有指定 main，则默认启动第一个非匹配指令的功能
             if (!plugin.main && plugin.features) {
               for (const feature of plugin.features) {
@@ -383,6 +385,7 @@ export const useCommandDataStore = defineStore('commandData', () => {
                   const hasTextCmd = feature.cmds.some((cmd: any) => typeof cmd === 'string')
                   if (hasTextCmd) {
                     defaultFeatureCode = feature.code
+                    defaultFeatureExplain = feature.explain
                     break
                   }
                 }
@@ -396,6 +399,8 @@ export const useCommandDataStore = defineStore('commandData', () => {
               type: 'plugin',
               featureCode: defaultFeatureCode,
               pluginName: plugin.name,
+              pluginTitle: plugin.title,
+              pluginExplain: defaultFeatureExplain || plugin.description,
               pinyin: pinyin(plugin.name, { toneType: 'none', type: 'string' })
                 .replace(/\s+/g, '')
                 .toLowerCase(),
@@ -431,6 +436,7 @@ export const useCommandDataStore = defineStore('commandData', () => {
                     type: 'plugin',
                     featureCode: feature.code,
                     pluginName: plugin.name,
+                    pluginTitle: plugin.title,
                     pluginExplain: feature.explain,
                     matchCmd: cmd,
                     cmdType: cmd.type, // 标记匹配类型
@@ -454,6 +460,7 @@ export const useCommandDataStore = defineStore('commandData', () => {
                     type: 'plugin',
                     featureCode: feature.code,
                     pluginName: plugin.name,
+                    pluginTitle: plugin.title,
                     pluginExplain: feature.explain,
                     cmdType: 'text', // 标记为文本类型
                     pinyin: pinyin(cmdName, { toneType: 'none', type: 'string' })

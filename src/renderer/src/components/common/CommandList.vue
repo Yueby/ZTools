@@ -17,6 +17,7 @@
           class="app-item"
           :class="{ selected: index === selectedIndex }"
           style="cursor: move"
+          :title="getTitleText(app)"
           @click="$emit('select', app)"
           @contextmenu.prevent="$emit('contextmenu', app)"
         >
@@ -46,6 +47,7 @@
         class="app-item"
         :class="{ selected: index === selectedIndex }"
         draggable="false"
+        :title="getTitleText(app)"
         @click="$emit('select', app)"
         @contextmenu.prevent="$emit('contextmenu', app)"
       >
@@ -164,6 +166,18 @@ watch(
 
 function getHighlightedName(app: Command): string {
   return highlightMatch(app.name, app.matches, app.matchType, props.searchQuery)
+}
+
+// 获取 title 文本（悬浮提示）
+function getTitleText(app: Command): string {
+  // 插件类型：显示功能说明和插件标题
+  if (app.type === 'plugin' && app.pluginExplain) {
+    const title = app.pluginTitle || app.pluginName || ''
+    return title ? `${app.pluginExplain}\n插件应用【${title}】` : app.pluginExplain
+  }
+
+  // 其他类型：显示名称
+  return app.name
 }
 
 // 记录图标加载失败的应用

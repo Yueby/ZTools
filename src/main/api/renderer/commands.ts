@@ -876,6 +876,8 @@ export class AppsAPI {
                 icon: feature.icon || plugin.logo,
                 type: 'plugin',
                 featureCode: feature.code,
+                pluginName: plugin.name,
+                pluginTitle: plugin.title,
                 pluginExplain: feature.explain,
                 cmdType: 'text'
               })
@@ -887,6 +889,8 @@ export class AppsAPI {
                 icon: feature.icon || plugin.logo,
                 type: 'plugin',
                 featureCode: feature.code,
+                pluginName: plugin.name,
+                pluginTitle: plugin.title,
                 pluginExplain: feature.explain,
                 cmdType: cmd.type,
                 matchCmd: {

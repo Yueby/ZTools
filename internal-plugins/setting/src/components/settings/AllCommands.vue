@@ -46,7 +46,7 @@
             draggable="false"
           />
           <span v-else class="source-icon">🧩</span>
-          <span class="source-name">{{ plugin.name }}</span>
+          <span class="source-name">{{ plugin.title }}</span>
           <span class="source-badge">{{ getPluginCommandCount(plugin) }}</span>
         </div>
 
