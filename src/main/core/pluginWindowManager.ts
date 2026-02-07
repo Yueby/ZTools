@@ -352,6 +352,17 @@ class PluginWindowManager {
     }
     this.windowInfoMap.clear()
   }
+
+  /**
+   * 广播消息到所有插件窗口（用于 browser 窗口）
+   */
+  public broadcastToAll(channel: string, ...args: any[]): void {
+    for (const windowInfo of Array.from(this.windowInfoMap.values())) {
+      if (!windowInfo.window.isDestroyed()) {
+        windowInfo.window.webContents.send(channel, ...args)
+      }
+    }
+  }
 }
 
 export default new PluginWindowManager()

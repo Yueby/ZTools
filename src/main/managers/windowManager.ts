@@ -694,6 +694,30 @@ class WindowManager {
   }
 
   /**
+   * 广播主题色到所有渲染进程
+   */
+  public broadcastPrimaryColor(primaryColor: string, customColor?: string): void {
+    const data = { primaryColor, customColor }
+    // 发送给主窗口
+    this.mainWindow?.webContents.send('update-primary-color', data)
+
+    // 发送给所有分离窗口
+    detachedWindowManager.broadcastToAllWindows('update-primary-color', data)
+  }
+
+  /**
+   * 广播亚克力透明度到所有渲染进程
+   */
+  public broadcastAcrylicOpacity(lightOpacity: number, darkOpacity: number): void {
+    const data = { lightOpacity, darkOpacity }
+    // 发送给主窗口
+    this.mainWindow?.webContents.send('update-acrylic-opacity', data)
+
+    // 发送给所有分离窗口
+    detachedWindowManager.broadcastToAllWindows('update-acrylic-opacity', data)
+  }
+
+  /**
    * 应用窗口材质
    */
   private applyMaterial(material: WindowMaterial): void {

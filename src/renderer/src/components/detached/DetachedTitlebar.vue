@@ -4,7 +4,26 @@
 
     <!-- 插件图标 -->
     <div class="plugin-info" @dblclick="handleDblClick">
-      <AdaptiveIcon v-if="pluginLogo" :src="pluginLogo" class="plugin-logo" alt="Plugin Logo" />
+      <div class="logo-container">
+        <!-- AI 状态动画层 -->
+        <div v-if="aiRequestStatus !== 'idle'" class="ai-animation-layer">
+          <!-- 蒙版层 -->
+          <div class="ai-mask"></div>
+          <!-- AI 文字 -->
+          <div class="ai-text">AI</div>
+          <!-- 发送状态：同心圆向外扩散 -->
+          <div v-if="aiRequestStatus === 'sending'" class="ai-ripple-container">
+            <div class="ai-ripple"></div>
+            <div class="ai-ripple" style="animation-delay: 0.6s"></div>
+          </div>
+          <!-- 接收状态：边缘向内收缩 -->
+          <div v-if="aiRequestStatus === 'receiving'" class="ai-pulse-container">
+            <div class="ai-pulse"></div>
+            <div class="ai-pulse" style="animation-delay: 0.6s"></div>
+          </div>
+        </div>
+        <AdaptiveIcon v-if="pluginLogo" :src="pluginLogo" class="plugin-logo" alt="Plugin Logo" />
+      </div>
     </div>
 
     <!-- 搜索栏 -->
@@ -120,6 +139,38 @@ const isPinned = ref(false)
 const searchInputRef = ref<HTMLInputElement | null>(null)
 const acrylicLightOpacity = ref(78) // 亚克力明亮模式透明度（默认 78%）
 const acrylicDarkOpacity = ref(50) // 亚克力暗黑模式透明度（默认 50%）
+const aiRequestStatus = ref<'idle' | 'sending' | 'receiving'>('idle') // AI 请求状态
+const primaryColor = ref('blue')
+const customColor = ref('#db2777')
+
+function getThemeColor(colorName: string, isDark: boolean): string {
+  const colors: Record<string, { light: string; dark: string }> = {
+    blue: { light: '#0284c7', dark: '#38bdf8' },
+    purple: { light: '#7c3aed', dark: '#a78bfa' },
+    green: { light: '#059669', dark: '#34d399' },
+    orange: { light: '#ea580c', dark: '#fb923c' },
+    red: { light: '#dc2626', dark: '#f87171' },
+    pink: { light: '#db2777', dark: '#f472b6' }
+  }
+  const color = colors[colorName]
+  if (color) {
+    return isDark ? color.dark : color.light
+  }
+  return isDark ? '#38bdf8' : '#0284c7' // fallback blue
+}
+
+function applyPrimaryColor(): void {
+  const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+  let colorValue = ''
+
+  if (primaryColor.value === 'custom') {
+    colorValue = customColor.value
+  } else {
+    colorValue = getThemeColor(primaryColor.value, isDark)
+  }
+
+  document.documentElement.style.setProperty('--primary-color', colorValue)
+}
 
 // 应用亚克力背景色叠加效果
 function applyAcrylicOverlay(): void {
@@ -185,6 +236,13 @@ onMounted(async () => {
         light: acrylicLightOpacity.value,
         dark: acrylicDarkOpacity.value
       })
+      if (settings.primaryColor) {
+        primaryColor.value = settings.primaryColor
+      }
+      if (settings.customColor) {
+        customColor.value = settings.customColor
+      }
+      applyPrimaryColor()
     }
   } catch (error) {
     console.error('加载亚克力透明度设置失败:', error)
@@ -225,6 +283,25 @@ onMounted(async () => {
       applyAcrylicOverlay()
     })
   }
+
+  // 监听主题色更新
+  if (window.ztools?.onUpdatePrimaryColor) {
+    window.ztools.onUpdatePrimaryColor((data: { primaryColor: string; customColor?: string }) => {
+      console.log('标题栏更新主题色:', data)
+      primaryColor.value = data.primaryColor
+      if (data.customColor) {
+        customColor.value = data.customColor
+      }
+      applyPrimaryColor()
+    })
+  }
+
+  // 监听系统主题变化
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    applyPrimaryColor()
+    // 重新应用亚克力效果（因为也依赖暗色模式）
+    applyAcrylicOverlay()
+  })
 
   // 监听初始化事件（注意：preload 已经过滤掉了 event，第一个参数直接就是 data）
   window.electron.ipcRenderer.on('init-titlebar', (data: any) => {
@@ -287,6 +364,13 @@ onMounted(async () => {
     console.log('更新子输入框可见性:', visible)
     subInputVisible.value = visible
   })
+
+  // 监听 AI 状态变化
+  if (window.ztools?.onAiStatusChanged) {
+    window.ztools.onAiStatusChanged((status: 'idle' | 'sending' | 'receiving') => {
+      aiRequestStatus.value = status
+    })
+  }
 })
 
 // 窗口控制
@@ -488,6 +572,7 @@ function sendKeyToPlugin(key: string): void {
   gap: 8px;
   padding: 0 8px;
   -webkit-app-region: drag;
+  overflow: visible;
 }
 
 .titlebar.darwin {
@@ -499,14 +584,137 @@ function sendKeyToPlugin(key: string): void {
   display: flex;
   align-items: center;
   flex-shrink: 0;
+  overflow: visible;
+}
+
+.logo-container {
+  position: relative;
+  width: 35px;
+  height: 35px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
 }
 
 .plugin-logo {
+  position: relative;
   width: 35px;
   height: 35px;
   border-radius: 6px;
   object-fit: contain;
   flex-shrink: 0;
+  z-index: 0;
+}
+
+/* AI 动画层 */
+.ai-animation-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* AI 蒙版层 */
+.ai-mask {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.7);
+  z-index: 1;
+}
+
+/* 暗色模式下使用黑色蒙版 */
+@media (prefers-color-scheme: dark) {
+  .ai-mask {
+    background: rgba(0, 0, 0, 0.7);
+  }
+}
+
+/* AI 文字 */
+.ai-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--primary-color, #3b82f6);
+  z-index: 3;
+  letter-spacing: 0.5px;
+}
+
+/* 发送状态：同心圆向外扩散 */
+.ai-ripple-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2;
+}
+
+.ai-ripple {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 1px solid var(--primary-color, #3b82f6);
+  opacity: 0;
+  animation: ripple-out 1.5s ease-out infinite;
+}
+
+@keyframes ripple-out {
+  0% {
+    transform: scale(0.3);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.2);
+    opacity: 0.3;
+  }
+}
+
+/* 接收状态：边缘向内收缩 */
+.ai-pulse-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2;
+}
+
+.ai-pulse {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 1px solid var(--primary-color, #3b82f6);
+  opacity: 0;
+  animation: pulse-in 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-in {
+  0% {
+    transform: scale(1.2);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(0);
+    opacity: 0.3;
+  }
 }
 
 /* 搜索栏 */

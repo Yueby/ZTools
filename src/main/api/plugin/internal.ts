@@ -444,8 +444,13 @@ export class InternalPluginAPI {
         if (!requireInternalPlugin(this.pluginManager, event)) {
           throw new PermissionDeniedError('internal:update-primary-color')
         }
+        const data = { primaryColor, customColor }
         // 广播到主渲染进程
-        this.mainWindow?.webContents.send('update-primary-color', { primaryColor, customColor })
+        this.mainWindow?.webContents.send('update-primary-color', data)
+
+        // 广播到所有分离窗口
+        detachedWindowManager.broadcastToAllWindows('update-primary-color', data)
+
         return { success: true }
       }
     )

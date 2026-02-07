@@ -119,7 +119,9 @@
         class="avatar-wrapper"
         :class="{
           loading: isPluginLoading,
-          'is-default': isDefaultAvatar
+          'is-default': isDefaultAvatar,
+          'ai-sending': windowStore.aiRequestStatus === 'sending',
+          'ai-receiving': windowStore.aiRequestStatus === 'receiving'
         }"
         @click="handleSettingsClick"
       >
@@ -137,17 +139,39 @@
             <circle cx="2" cy="16" r="2" fill="currentColor" opacity="0.7" />
           </svg>
         </div>
-        <AdaptiveIcon
-          :src="avatarUrl"
-          :force-adaptive="false"
-          :class="[
-            'search-btn',
-            { 'plugin-logo': windowStore.currentPlugin?.logo && !isPluginLoading },
-            { 'is-default': isDefaultAvatar }
-          ]"
-          draggable="false"
-        />
-        <div v-if="isPluginLoading" class="avatar-spinner"></div>
+        <!-- 头像容器（包含头像、动画层、加载动画）-->
+        <div class="avatar-container">
+          <!-- AI 状态动画层 -->
+          <div v-if="windowStore.aiRequestStatus !== 'idle'" class="ai-animation-layer">
+            <!-- 蒙版层 -->
+            <div class="ai-mask"></div>
+            <!-- AI 文字 -->
+            <div class="ai-text">AI</div>
+            <!-- 发送状态：同心圆向外扩散 -->
+            <div v-if="windowStore.aiRequestStatus === 'sending'" class="ai-ripple-container">
+              <div class="ai-ripple"></div>
+              <!-- <div class="ai-ripple" style="animation-delay: 0.3s"></div> -->
+              <div class="ai-ripple" style="animation-delay: 0.6s"></div>
+            </div>
+            <!-- 接收状态：边缘向内收缩 -->
+            <div v-if="windowStore.aiRequestStatus === 'receiving'" class="ai-pulse-container">
+              <div class="ai-pulse"></div>
+              <!-- <div class="ai-pulse" style="animation-delay: 0.3s"></div> -->
+              <div class="ai-pulse" style="animation-delay: 0.6s"></div>
+            </div>
+          </div>
+          <AdaptiveIcon
+            :src="avatarUrl"
+            :force-adaptive="false"
+            :class="[
+              'search-btn',
+              { 'plugin-logo': windowStore.currentPlugin?.logo && !isPluginLoading },
+              { 'is-default': isDefaultAvatar }
+            ]"
+            draggable="false"
+          />
+          <div v-if="isPluginLoading" class="avatar-spinner"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -706,6 +730,11 @@ onMounted(() => {
     searchBoxRef.value.addEventListener('drop', handleDrop)
   }
 
+  // 监听 AI 状态变化
+  window.ztools.onAiStatusChanged?.((status: 'idle' | 'sending' | 'receiving') => {
+    windowStore.setAiRequestStatus(status)
+  })
+
   // 监听菜单命令
   window.ztools.onContextMenuCommand(async (command) => {
     if (command === 'open-devtools') {
@@ -1221,6 +1250,15 @@ defineExpose({
   gap: 6px;
 }
 
+.avatar-container {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .avatar-wrapper.loading .search-btn {
   opacity: 0.9;
 }
@@ -1260,6 +1298,116 @@ defineExpose({
   }
   to {
     transform: rotate(360deg);
+  }
+}
+
+/* AI 动画层 */
+.ai-animation-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* AI 蒙版层 */
+.ai-mask {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.7);
+  z-index: 1;
+}
+
+/* 暗色模式下使用黑色蒙版 */
+@media (prefers-color-scheme: dark) {
+  .ai-mask {
+    background: rgba(0, 0, 0, 0.7);
+  }
+}
+
+/* AI 文字 */
+.ai-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--primary-color);
+  z-index: 3;
+  letter-spacing: 0.5px;
+}
+
+/* 发送状态：同心圆向外扩散 */
+.ai-ripple-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2;
+}
+
+.ai-ripple {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 1px solid var(--primary-color);
+  opacity: 0;
+  animation: ripple-out 1.5s ease-out infinite;
+}
+
+@keyframes ripple-out {
+  0% {
+    transform: scale(0.3);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.2);
+    opacity: 0.3;
+  }
+}
+
+/* 接收状态：边缘向内收缩 */
+.ai-pulse-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2;
+}
+
+.ai-pulse {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 1px solid var(--primary-color);
+  opacity: 0;
+  animation: pulse-in 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-in {
+  0% {
+    transform: scale(1.2);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(0);
+    opacity: 0.3;
   }
 }
 </style>

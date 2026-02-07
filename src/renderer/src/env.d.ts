@@ -225,6 +225,7 @@ declare global {
       openSettings: () => void
       onUpdatePlaceholder: (callback: (placeholder: string) => void) => void
       onUpdateAvatar: (callback: (avatar: string) => void) => void
+      onAiStatusChanged: (callback: (status: 'idle' | 'sending' | 'receiving') => void) => void
       onUpdateAutoPaste: (callback: (autoPaste: string) => void) => void
       onUpdateAutoClear: (callback: (autoClear: string) => void) => void
       onUpdateShowRecentInSearch: (callback: (showRecentInSearch: boolean) => void) => void

@@ -148,6 +148,9 @@ const api = {
   onUpdateAvatar: (callback: (avatar: string) => void) => {
     ipcRenderer.on('update-avatar', (_event, avatar) => callback(avatar))
   },
+  onAiStatusChanged: (callback: (status: 'idle' | 'sending' | 'receiving') => void) => {
+    ipcRenderer.on('ai-status-changed', (_event, status) => callback(status))
+  },
   onUpdateAutoPaste: (callback: (autoPaste: string) => void) => {
     ipcRenderer.on('update-auto-paste', (_event, autoPaste) => callback(autoPaste))
   },

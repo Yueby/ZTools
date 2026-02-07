@@ -66,7 +66,7 @@ class APIManager {
     localShortcutsAPI.init(mainWindow)
 
     // 初始化插件API
-    pluginAiAPI.init(pluginManager)
+    pluginAiAPI.init(mainWindow, pluginManager)
     pluginLifecycleAPI.init(mainWindow, pluginManager)
     pluginUIAPI.init(mainWindow, pluginManager)
     pluginClipboardAPI.init()

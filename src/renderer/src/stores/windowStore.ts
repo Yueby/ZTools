@@ -42,6 +42,9 @@ interface UpdateDownloadInfo {
   changelog?: string[]
 }
 
+// AI 请求状态
+export type AiRequestStatus = 'idle' | 'sending' | 'receiving'
+
 export const useWindowStore = defineStore('window', () => {
   // 当前激活窗口信息
   const currentWindow = ref<WindowInfo | null>(null)
@@ -54,6 +57,9 @@ export const useWindowStore = defineStore('window', () => {
   const currentPlugin = ref<PluginInfo | null>(null)
   // 插件加载中状态（用于显示 loading 动效）
   const pluginLoading = ref(false)
+
+  // AI 请求状态（用于显示 AI 调用动画）
+  const aiRequestStatus = ref<AiRequestStatus>('idle')
 
   // 子输入框配置 (插件模式下使用)
   const subInputPlaceholder = ref('搜索')
@@ -432,6 +438,11 @@ export const useWindowStore = defineStore('window', () => {
     }
   }
 
+  // 更新 AI 请求状态
+  function setAiRequestStatus(status: AiRequestStatus): void {
+    aiRequestStatus.value = status
+  }
+
   // 从数据库加载设置
   async function loadSettings(): Promise<void> {
     try {
@@ -504,6 +515,7 @@ export const useWindowStore = defineStore('window', () => {
     avatar,
     currentPlugin,
     pluginLoading,
+    aiRequestStatus,
     subInputPlaceholder,
     subInputVisible,
     autoPaste,
@@ -520,6 +532,7 @@ export const useWindowStore = defineStore('window', () => {
     updateAvatar,
     updateCurrentPlugin,
     setPluginLoading,
+    setAiRequestStatus,
     updateSubInputPlaceholder,
     updateSubInputVisible,
     updateAutoPaste,

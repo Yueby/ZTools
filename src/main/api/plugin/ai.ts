@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron'
 import lmdbInstance from '../../core/lmdb/lmdbInstance'
 import type { AiModel } from '../renderer/aiModels'
+import detachedWindowManager from '../../core/detachedWindowManager'
 
 /**
  * AI 选项
@@ -55,12 +56,14 @@ export interface Tool {
  */
 class PluginAiAPI {
   private pluginManager: any = null
+  private mainWindow: Electron.BrowserWindow | null = null
   private abortControllers: Map<string, AbortController> = new Map()
 
   /**
    * 初始化 API
    */
-  public init(pluginManager: any): void {
+  public init(mainWindow: Electron.BrowserWindow, pluginManager: any): void {
+    this.mainWindow = mainWindow
     this.pluginManager = pluginManager
     this.setupIPC()
   }
@@ -81,6 +84,8 @@ class PluginAiAPI {
         return result
       } catch (error: unknown) {
         console.error('AI 调用失败:', error)
+        // 确保失败时重置状态
+        this.notifyAiStatus('idle', event.sender)
         return {
           success: false,
           error: error instanceof Error ? error.message : '未知错误'
@@ -104,6 +109,8 @@ class PluginAiAPI {
         return { success: true }
       } catch (error: unknown) {
         console.error('AI 流式调用失败:', error)
+        // 确保失败时重置状态
+        this.notifyAiStatus('idle', event.sender)
         return {
           success: false,
           error: error instanceof Error ? error.message : '未知错误'
@@ -171,6 +178,41 @@ class PluginAiAPI {
         }
       }
     )
+  }
+
+  /**
+   * 通知窗口 AI 请求状态变化
+   * @param status AI 状态
+   * @param webContents 插件的 WebContents（用于确定通知目标窗口）
+   */
+  private notifyAiStatus(
+    status: 'idle' | 'sending' | 'receiving',
+    webContents: Electron.WebContents
+  ): void {
+    // 通过 pluginManager 获取插件信息
+    const pluginInfo = this.pluginManager.getPluginInfoByWebContents(webContents)
+    if (!pluginInfo) {
+      console.warn('无法获取插件信息，无法发送 AI 状态通知')
+      return
+    }
+
+    // 检查是否在分离窗口中
+    const detachedWindows = detachedWindowManager.getAllWindows()
+
+    for (const windowInfo of detachedWindows) {
+      if (windowInfo.view.webContents === webContents) {
+        // 插件在分离窗口中，向分离窗口发送通知
+        if (windowInfo.window && !windowInfo.window.isDestroyed()) {
+          windowInfo.window.webContents.send('ai-status-changed', status)
+        }
+        return
+      }
+    }
+
+    // 插件在主窗口中，向主窗口发送通知
+    if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+      this.mainWindow.webContents.send('ai-status-changed', status)
+    }
   }
 
   /**
@@ -330,8 +372,15 @@ class PluginAiAPI {
       while (loopCount < maxLoops) {
         loopCount++
 
+        // 通知开始发送请求
+        this.notifyAiStatus('sending', webContents)
+
         const requestBody = this.buildRequestBody(modelConfig, messages, option.tools, false)
         const response = await this.sendAPIRequest(modelConfig, requestBody, abortController)
+
+        // 通知开始接收响应
+        this.notifyAiStatus('receiving', webContents)
+
         const data = await response.json()
 
         const assistantMessage: Message = {
@@ -348,14 +397,20 @@ class PluginAiAPI {
           continue
         }
 
+        // 请求成功完成，重置状态
+        this.notifyAiStatus('idle', webContents)
         return { success: true, data: assistantMessage }
       }
 
+      // 循环超限，重置状态
+      this.notifyAiStatus('idle', webContents)
       return {
         success: false,
         error: `工具调用循环超过最大次数 (${maxLoops})，可能存在无限循环`
       }
     } catch (error: unknown) {
+      // 出错时重置状态
+      this.notifyAiStatus('idle', webContents)
       if (error instanceof Error && error.name === 'AbortError') {
         return { success: false, error: 'AI 调用已中止' }
       }
@@ -523,8 +578,14 @@ class PluginAiAPI {
       while (loopCount < maxLoops) {
         loopCount++
 
+        // 通知开始发送请求
+        this.notifyAiStatus('sending', webContents)
+
         const requestBody = this.buildRequestBody(modelConfig, messages, option.tools, true)
         const response = await this.sendAPIRequest(modelConfig, requestBody, abortController)
+
+        // 通知开始接收响应
+        this.notifyAiStatus('receiving', webContents)
 
         const { content, reasoning_content, tool_calls } = await this.parseStreamResponse(
           response,
@@ -543,11 +604,17 @@ class PluginAiAPI {
           continue
         }
 
+        // 流式调用成功完成，重置状态
+        this.notifyAiStatus('idle', webContents)
         return
       }
 
+      // 循环超限，重置状态
+      this.notifyAiStatus('idle', webContents)
       throw new Error(`工具调用循环超过最大次数 (${maxLoops})，可能存在无限循环`)
     } catch (error: unknown) {
+      // 出错时重置状态
+      this.notifyAiStatus('idle', webContents)
       if (error instanceof Error && error.name === 'AbortError') {
         throw new Error('AI 调用已中止')
       }
