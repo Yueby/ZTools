@@ -303,6 +303,10 @@ const api = {
   superPanelLaunch: (command: any) => ipcRenderer.invoke('super-panel:launch', command),
   superPanelReady: () => ipcRenderer.send('super-panel:ready'),
   superPanelShowPinned: () => ipcRenderer.send('super-panel:show-pinned'),
+  updateSuperPanelPinnedOrder: (commands: any[]) =>
+    ipcRenderer.invoke('super-panel:update-pinned-order', commands),
+  unpinSuperPanelCommand: (path: string, featureCode?: string) =>
+    ipcRenderer.invoke('super-panel:unpin-command', path, featureCode),
   onSuperPanelLaunch: (callback: (data: { command: any; clipboardContent?: any }) => void) => {
     ipcRenderer.on('super-panel-launch', (_event, data) => callback(data))
   }
@@ -517,6 +521,14 @@ declare global {
           useCount: number
         }>
       >
+      // 超级面板相关
+      updateSuperPanelPinnedOrder: (
+        commands: any[]
+      ) => Promise<{ success: boolean; error?: string }>
+      unpinSuperPanelCommand: (
+        path: string,
+        featureCode?: string
+      ) => Promise<{ success: boolean; error?: string }>
       // AI 模型管理
       aiModels: {
         getAll: () => Promise<{ success: boolean; data?: any[]; error?: string }>

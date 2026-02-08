@@ -320,6 +320,13 @@ declare global {
       superPanelLaunch: (command: any) => Promise<{ success: boolean; error?: string }>
       superPanelReady: () => void
       superPanelShowPinned: () => void
+      updateSuperPanelPinnedOrder: (
+        commands: any[]
+      ) => Promise<{ success: boolean; error?: string }>
+      unpinSuperPanelCommand: (
+        path: string,
+        featureCode?: string
+      ) => Promise<{ success: boolean; error?: string }>
       onSuperPanelLaunch: (
         callback: (data: { command: any; clipboardContent?: any }) => void
       ) => void

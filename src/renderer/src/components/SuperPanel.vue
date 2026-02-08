@@ -9,31 +9,43 @@
         <span class="header-text">超级面板</span>
       </div>
 
-      <div class="pinned-grid">
-        <div
-          v-for="(cmd, index) in pinnedCommands"
-          :key="`${cmd.path}-${cmd.featureCode || ''}`"
-          class="grid-item"
-          :class="{ selected: index === selectedIndex }"
-          @click="launch(cmd)"
-          @mouseenter="selectedIndex = index"
-        >
-          <img
-            v-if="cmd.icon && !iconErrors.has(getItemKey(cmd))"
-            :src="cmd.icon"
-            class="grid-icon"
-            draggable="false"
-            @error="iconErrors.add(getItemKey(cmd))"
-          />
-          <div v-else class="grid-icon-placeholder">
-            {{ cmd.name.charAt(0).toUpperCase() }}
+      <!-- 固定列表：使用 Draggable 组件 -->
+      <Draggable
+        v-if="pinnedCommands.length > 0"
+        v-model="pinnedCommands"
+        class="pinned-grid"
+        item-key="path"
+        :animation="200"
+        ghost-class="ghost"
+        chosen-class="chosen"
+        @end="onDragEnd"
+      >
+        <template #item="{ element: cmd, index }">
+          <div
+            class="grid-item"
+            :class="{ selected: index === selectedIndex }"
+            style="cursor: move"
+            @click="launch(cmd)"
+            @mouseenter="selectedIndex = index"
+            @contextmenu.prevent="handleContextMenu(cmd)"
+          >
+            <img
+              v-if="cmd.icon && !iconErrors.has(getItemKey(cmd))"
+              :src="cmd.icon"
+              class="grid-icon"
+              draggable="false"
+              @error="iconErrors.add(getItemKey(cmd))"
+            />
+            <div v-else class="grid-icon-placeholder">
+              {{ cmd.name.charAt(0).toUpperCase() }}
+            </div>
+            <span class="grid-name">{{ cmd.name }}</span>
           </div>
-          <span class="grid-name">{{ cmd.name }}</span>
-        </div>
-        <!-- 空状态 -->
-        <div v-if="pinnedCommands.length === 0" class="empty-state">
-          <span class="empty-text">暂无固定项目</span>
-        </div>
+        </template>
+      </Draggable>
+      <!-- 空状态 -->
+      <div v-if="pinnedCommands.length === 0" class="empty-state">
+        <span class="empty-text">暂无固定项目</span>
       </div>
     </template>
 
@@ -98,6 +110,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import Draggable from 'vuedraggable'
 import defaultAvatar from '../assets/image/default.png'
 
 interface CommandItem {
@@ -144,6 +157,28 @@ const clipboardDescription = computed(() => {
   }
   return ''
 })
+
+// 拖动排序结束后保存顺序
+async function onDragEnd(): Promise<void> {
+  try {
+    // 将响应式对象转换为纯 JSON 对象，避免克隆错误
+    const plainCommands = JSON.parse(JSON.stringify(pinnedCommands.value))
+    await window.ztools.updateSuperPanelPinnedOrder(plainCommands)
+  } catch (error) {
+    console.error('保存固定列表顺序失败:', error)
+  }
+}
+
+// 右键菜单
+async function handleContextMenu(cmd: CommandItem): Promise<void> {
+  const menuItems = [
+    {
+      id: `unpin:${JSON.stringify({ path: cmd.path, featureCode: cmd.featureCode })}`,
+      label: '取消固定'
+    }
+  ]
+  await window.ztools.showContextMenu(menuItems)
+}
 
 // 返回固定列表
 function showPinned(): void {
@@ -320,6 +355,22 @@ onMounted(() => {
     avatar.value = newAvatar || defaultAvatar
   })
 
+  // 监听右键菜单命令
+  window.ztools.onContextMenuCommand(async (command: string) => {
+    console.log('[SuperPanel] 收到右键菜单命令:', command)
+    if (command.startsWith('unpin:')) {
+      const jsonStr = command.replace('unpin:', '')
+      try {
+        const { path, featureCode } = JSON.parse(jsonStr)
+        console.log('[SuperPanel] 准备取消固定:', { path, featureCode })
+        await window.ztools.unpinSuperPanelCommand(path, featureCode)
+        console.log('[SuperPanel] 取消固定成功')
+      } catch (error) {
+        console.error('[SuperPanel] 取消固定失败:', error)
+      }
+    }
+  })
+
   // 聚焦以接收键盘事件
   const panel = document.querySelector('.super-panel') as HTMLElement
   if (panel) {
@@ -482,6 +533,7 @@ onUnmounted(() => {
 .grid-name {
   font-size: 11px;
   font-weight: 500;
+  pointer-events: none; /* 防止拖动时文字阻碍拖动 */
   line-height: 14px;
   color: var(--text-color);
   text-align: center;
@@ -494,6 +546,26 @@ onUnmounted(() => {
   overflow: hidden;
   word-break: break-all;
   flex-shrink: 0;
+}
+
+/* 拖动时的样式 */
+.ghost {
+  opacity: 0.5;
+  background: var(--border-color);
+}
+
+.chosen {
+  opacity: 0.8;
+}
+
+/* 防止拖动时图标和文字阻碍拖动 */
+:deep(.ghost .grid-icon),
+:deep(.ghost .grid-icon-placeholder),
+:deep(.ghost .grid-name),
+:deep(.chosen .grid-icon),
+:deep(.chosen .grid-icon-placeholder),
+:deep(.chosen .grid-name) {
+  pointer-events: none;
 }
 
 /* ========== 列表模式 ========== */

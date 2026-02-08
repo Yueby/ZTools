@@ -542,6 +542,57 @@ class SuperPanelManager {
     ipcMain.on('super-panel:show-pinned', () => {
       this.loadPinnedCommands()
     })
+
+    // 更新超级面板固定列表顺序
+    ipcMain.handle('super-panel:update-pinned-order', async (_event, commands: any[]) => {
+      try {
+        await databaseAPI.dbPut('super-panel-pinned', commands)
+        return { success: true }
+      } catch (error) {
+        console.error('更新超级面板固定列表顺序失败:', error)
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : '未知错误'
+        }
+      }
+    })
+
+    // 取消固定命令
+    ipcMain.handle(
+      'super-panel:unpin-command',
+      async (_event, path: string, featureCode?: string) => {
+        try {
+          console.log('[超级面板] 收到取消固定请求:', { path, featureCode })
+          let pinnedCommands = await databaseAPI.dbGet('super-panel-pinned')
+          if (!Array.isArray(pinnedCommands)) {
+            pinnedCommands = []
+          }
+
+          // 过滤掉要取消固定的命令
+          pinnedCommands = pinnedCommands.filter((cmd: any) => {
+            if (featureCode) {
+              return !(cmd.path === path && cmd.featureCode === featureCode)
+            }
+            return cmd.path !== path
+          })
+
+          console.log('[超级面板] 更新后的固定列表:', pinnedCommands.length, '项')
+          await databaseAPI.dbPut('super-panel-pinned', pinnedCommands)
+
+          // 重新加载固定列表
+          this.loadPinnedCommands()
+          console.log('[超级面板] 已重新加载固定列表')
+
+          return { success: true }
+        } catch (error) {
+          console.error('取消固定失败:', error)
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : '未知错误'
+          }
+        }
+      }
+    )
   }
 }
 

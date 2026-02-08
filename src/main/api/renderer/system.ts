@@ -40,7 +40,9 @@ export class SystemAPI {
     ipcMain.handle('check-file-paths', (_event, paths: string[]) => this.checkFilePaths(paths))
 
     // UI
-    ipcMain.handle('show-context-menu', (_event, menuItems) => this.showContextMenu(menuItems))
+    ipcMain.handle('show-context-menu', (event, menuItems) =>
+      this.showContextMenu(event, menuItems)
+    )
     ipcMain.handle('select-avatar', () => this.selectAvatar())
 
     // App Info
@@ -172,20 +174,23 @@ export class SystemAPI {
     }
   }
 
-  private async showContextMenu(menuItems: any): Promise<void> {
+  private async showContextMenu(event: Electron.IpcMainInvokeEvent, menuItems: any): Promise<void> {
     if (!this.mainWindow) return
 
-    const buildTemplate = (items: any[]): any[] => {
+    const senderWebContents = event.sender
+
+    const buildTemplate = (items: any[], senderWebContents: Electron.WebContents): any[] => {
       return items.map((item: any) => {
         const menuItem: any = {
           label: item.label
         }
 
         if (item.submenu) {
-          menuItem.submenu = buildTemplate(item.submenu)
+          menuItem.submenu = buildTemplate(item.submenu, senderWebContents)
         } else {
           menuItem.click = () => {
-            this.mainWindow?.webContents.send('context-menu-command', item.id)
+            // 将命令发送到触发菜单的窗口，而不是总是发送到主窗口
+            senderWebContents.send('context-menu-command', item.id)
           }
         }
 
@@ -199,7 +204,7 @@ export class SystemAPI {
       })
     }
 
-    const template = buildTemplate(menuItems)
+    const template = buildTemplate(menuItems, senderWebContents)
 
     const menu = Menu.buildFromTemplate(template)
     menu.popup({ window: this.mainWindow })
