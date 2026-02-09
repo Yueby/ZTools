@@ -2,6 +2,25 @@ import { computed } from 'vue'
 import { useCommandDataStore } from '../stores/commandDataStore'
 
 /**
+ * 去重：同一个 feature 只保留第一个匹配的 cmd
+ * 插件类型用 path+featureCode 去重，非插件用 name+path 去重
+ */
+export function deduplicateResults<T extends { type?: string; path: string; name: string; featureCode?: string }>(
+  results: T[]
+): T[] {
+  const seenFeatures = new Set<string>()
+  return results.filter((item) => {
+    const featureKey =
+      item.type === 'plugin' ? `${item.path}:${item.featureCode}` : `${item.name}|${item.path}`
+    if (seenFeatures.has(featureKey)) {
+      return false
+    }
+    seenFeatures.add(featureKey)
+    return true
+  })
+}
+
+/**
  * 搜索结果计算 Composable
  * 统一管理所有搜索结果的计算逻辑
  */
@@ -145,15 +164,7 @@ export function useSearchResults(props: {
     }
 
     // 去重：同一个 feature 只保留第一个匹配的 cmd
-    const seenFeatures = new Set<string>()
-    return overTypeResults.filter((item) => {
-      const featureKey = item.type === 'plugin' ? `${item.path}:${item.featureCode}` : item.path
-      if (seenFeatures.has(featureKey)) {
-        return false
-      }
-      seenFeatures.add(featureKey)
-      return true
-    })
+    return deduplicateResults(overTypeResults)
   })
 
   // 列表模式：合并所有搜索结果

@@ -14,7 +14,7 @@
         v-if="pinnedCommands.length > 0"
         v-model="pinnedCommands"
         class="pinned-grid"
-        item-key="path"
+        :item-key="(item: any) => `${item.name}|${item.path}|${item.featureCode || ''}`"
         :animation="200"
         ghost-class="ghost"
         chosen-class="chosen"
@@ -73,7 +73,7 @@
       <div class="search-list">
         <div
           v-for="(result, index) in searchResults"
-          :key="`${result.path}-${result.featureCode || ''}`"
+          :key="`${result.name}|${result.path}-${result.featureCode || ''}`"
           class="list-item"
           :class="{ selected: index === selectedIndex }"
           @click="launch(result)"

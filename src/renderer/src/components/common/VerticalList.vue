@@ -2,7 +2,7 @@
   <div v-if="apps.length > 0" class="vertical-list">
     <div
       v-for="(app, index) in apps"
-      :key="app.path + (app.featureCode || '')"
+      :key="app.name + '|' + app.path + (app.featureCode || '')"
       class="list-item"
       :class="{ selected: index === selectedIndex }"
       @click="$emit('select', app)"

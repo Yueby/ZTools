@@ -4,7 +4,7 @@ import path from 'path'
 /**
  * 获取 Windows 开始菜单路径
  */
-export function getWindowsStartMenuPaths(): string[] {
+export function getWindowsScanPaths(): string[] {
   // 系统级开始菜单
   const programDataStartMenu = path.join(
     'C:',
@@ -26,7 +26,13 @@ export function getWindowsStartMenuPaths(): string[] {
     'Programs'
   )
 
-  return [programDataStartMenu, userStartMenu]
+  // 用户桌面
+  const userDesktop = path.join(os.homedir(), 'Desktop')
+
+  // 公共桌面
+  const publicDesktop = path.join('C:', 'Users', 'Public', 'Desktop')
+
+  return [programDataStartMenu, userStartMenu, userDesktop, publicDesktop]
 }
 
 /**
