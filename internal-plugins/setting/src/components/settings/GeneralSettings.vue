@@ -358,15 +358,18 @@
       </div>
       <div class="setting-control">
         <Dropdown
-          v-model="superPanelMouseButton"
+          v-model="superPanelTriggerMode"
           :options="superPanelMouseButtonOptions"
-          @change="handleSuperPanelMouseButtonChange"
+          @change="handleSuperPanelTriggerModeChange"
         />
       </div>
     </div>
 
     <!-- 超级面板长按响应时间 -->
-    <div v-if="superPanelEnabled" class="setting-item sub-setting">
+    <div
+      v-if="superPanelEnabled && superPanelTriggerMode.endsWith('-long')"
+      class="setting-item sub-setting"
+    >
       <div class="setting-label">
         <span>长按响应时间</span>
         <span class="setting-desc">长按鼠标按键多少毫秒后弹出超级面板</span>
@@ -581,10 +584,13 @@ const searchModeOptions = [
 ]
 
 const superPanelMouseButtonOptions = [
-  { label: '鼠标中键', value: 'middle' },
-  { label: '鼠标右键', value: 'right' },
-  { label: '鼠标后退键', value: 'back' },
-  { label: '鼠标前进键', value: 'forward' }
+  { label: '按下鼠标中键', value: 'middle' },
+  { label: '长按鼠标中键', value: 'middle-long' },
+  { label: '长按鼠标右键', value: 'right-long' },
+  { label: '按下鼠标后退键', value: 'back' },
+  { label: '长按鼠标后退键', value: 'back-long' },
+  { label: '按下鼠标前进键', value: 'forward' },
+  { label: '长按鼠标前进键', value: 'forward-long' }
 ]
 
 // 当前平台（与 window.ztools.getPlatform 返回类型保持一致）
@@ -612,6 +618,25 @@ const searchMode = ref<'aggregate' | 'list'>('aggregate')
 const superPanelEnabled = ref(false)
 const superPanelMouseButton = ref<MouseButtonType>('middle')
 const superPanelLongPressMs = ref(500)
+
+// 超级面板触发模式（计算属性）
+const superPanelTriggerMode = computed({
+  get: () => {
+    // 右键特殊处理，如果配置是右键，强制显示为长按右键
+    if (superPanelMouseButton.value === 'right') {
+      return 'right-long'
+    }
+    // 如果长按时间大于0，显示为长按模式
+    if (superPanelLongPressMs.value > 0) {
+      return `${superPanelMouseButton.value}-long`
+    }
+    // 否则显示为短按模式
+    return superPanelMouseButton.value
+  },
+  set: () => {
+    // 这里的 setter 主要用于 v-model 绑定，实际更新逻辑在 handleSuperPanelTriggerModeChange 中
+  }
+})
 
 // 实际快捷键字符串
 const hotkey = ref('')
@@ -910,22 +935,39 @@ async function handleSuperPanelEnabledChange(): Promise<void> {
   }
 }
 
-// 处理超级面板鼠标按键变化
-async function handleSuperPanelMouseButtonChange(): Promise<void> {
+// 处理超级面板触发模式变化
+async function handleSuperPanelTriggerModeChange(mode: string): Promise<void> {
   try {
-    // right 按键必须 longPressMs > 0
-    if (superPanelMouseButton.value === 'right' && superPanelLongPressMs.value < 200) {
-      superPanelLongPressMs.value = 500
+    let mouseButton: MouseButtonType
+    let longPressMs: number
+
+    if (mode.endsWith('-long')) {
+      // 长按模式
+      mouseButton = mode.replace('-long', '') as MouseButtonType
+      // 如果之前的长按时间太短或为0，设置为默认200ms
+      longPressMs =
+        superPanelLongPressMs.value && superPanelLongPressMs.value >= 200
+          ? superPanelLongPressMs.value
+          : 200
+    } else {
+      // 短按模式
+      mouseButton = mode as MouseButtonType
+      longPressMs = 0
     }
+
+    // 更新本地状态
+    superPanelMouseButton.value = mouseButton
+    superPanelLongPressMs.value = longPressMs
+
     await saveSettings()
     await window.ztools.internal.updateSuperPanelConfig({
       enabled: superPanelEnabled.value,
       mouseButton: superPanelMouseButton.value,
       longPressMs: superPanelLongPressMs.value
     })
-    console.log('超级面板鼠标按键已更新:', superPanelMouseButton.value)
+    console.log('超级面板触发模式已更新:', mode)
   } catch (err) {
-    console.error('更新超级面板鼠标按键失败:', err)
+    console.error('更新超级面板触发模式失败:', err)
   }
 }
 
