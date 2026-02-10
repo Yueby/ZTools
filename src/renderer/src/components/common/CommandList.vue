@@ -5,7 +5,7 @@
       v-if="props.draggable"
       v-model="localApps"
       class="app-grid"
-      item-key="path"
+      :item-key="(item: any) => `${item.name}|${item.path}|${item.featureCode || ''}`"
       :animation="200"
       ghost-class="ghost"
       chosen-class="chosen"

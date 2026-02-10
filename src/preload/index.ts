@@ -65,12 +65,12 @@ const api = {
   selectAvatar: () => ipcRenderer.invoke('select-avatar'),
   openSettings: () => ipcRenderer.send('open-settings'),
   // 历史记录管理
-  removeFromHistory: (appPath: string, featureCode?: string) =>
-    ipcRenderer.invoke('remove-from-history', appPath, featureCode),
+  removeFromHistory: (appPath: string, featureCode?: string, name?: string) =>
+    ipcRenderer.invoke('remove-from-history', appPath, featureCode, name),
   // 固定应用管理
   pinApp: (app: any) => ipcRenderer.invoke('pin-app', app),
-  unpinApp: (appPath: string, featureCode?: string) =>
-    ipcRenderer.invoke('unpin-app', appPath, featureCode),
+  unpinApp: (appPath: string, featureCode?: string, name?: string) =>
+    ipcRenderer.invoke('unpin-app', appPath, featureCode, name),
   updatePinnedOrder: (newOrder: any[]) => ipcRenderer.invoke('update-pinned-order', newOrder),
   hidePlugin: () => ipcRenderer.send('hide-plugin'),
   onContextMenuCommand: (callback: (command: string) => void) => {
@@ -399,10 +399,10 @@ declare global {
       }) => Promise<{ success: boolean; error?: string }>
       selectAvatar: () => Promise<{ success: boolean; path?: string; error?: string }>
       // 历史记录管理
-      removeFromHistory: (appPath: string, featureCode?: string) => Promise<void>
+      removeFromHistory: (appPath: string, featureCode?: string, name?: string) => Promise<void>
       // 固定应用管理
       pinApp: (app: any) => Promise<void>
-      unpinApp: (appPath: string, featureCode?: string) => Promise<void>
+      unpinApp: (appPath: string, featureCode?: string, name?: string) => Promise<void>
       updatePinnedOrder: (newOrder: any[]) => Promise<void>
       hidePlugin: () => void
       onContextMenuCommand: (callback: (command: string) => void) => void

@@ -2,13 +2,13 @@ import { shell } from 'electron'
 import fsPromises from 'fs/promises'
 import path from 'path'
 import { extractAcronym } from '../../utils/common'
-import { getWindowsStartMenuPaths } from '../../utils/systemPaths'
+import { getWindowsScanPaths } from '../../utils/systemPaths'
 import { Command } from './types'
 
 // ========== 配置 ==========
 
 // 要跳过的文件夹名称
-const SKIP_FOLDERS = [
+export const SKIP_FOLDERS = [
   'sdk',
   'doc',
   'docs',
@@ -21,9 +21,9 @@ const SKIP_FOLDERS = [
   'documentation'
 ]
 
-// 要跳过的目标文件扩展名（文档、网页等）
-const SKIP_EXTENSIONS = [
-  '.url', // 网页快捷方式
+// 要跳过的目标文件扩展名（文档、网页等，用于检查 .lnk 快捷方式的目标路径）
+// 注意：.url 不在此列表中，会单独解析内容判断是否为应用协议
+export const SKIP_EXTENSIONS = [
   '.html', // 网页文件
   '.htm',
   '.pdf', // PDF文档
@@ -40,7 +40,7 @@ const SKIP_EXTENSIONS = [
 ]
 
 // 要跳过的快捷方式名称关键词（不区分大小写）
-const SKIP_NAME_PATTERN =
+export const SKIP_NAME_PATTERN =
   /^uninstall |^卸载|卸载$|website|网站|帮助|help|readme|read me|文档|manual|license|documentation/i
 
 // 要跳过的目标可执行文件名（卸载程序、安装程序等）
@@ -50,17 +50,21 @@ const SKIP_NAME_PATTERN =
 //   - 过滤所有以 "uninstall"/"install" 开头的（包括 Installer.exe, UninstallSpineTrial.exe 等）
 //   - 过滤 "uninst" 开头的（但 "unins" + 数字除外，需要精确匹配）
 //   - 保留配置工具（如 "GameSetup.exe"，不以 setup/install 开头）
-const SKIP_TARGET_PATTERN =
+export const SKIP_TARGET_PATTERN =
   /^uninstall|^uninst|^unins\d+$|^unwise|^_uninst|^setup$|^install|^instmsi|卸载程序|安装程序/i
 
 // Windows 系统目录（不应该扫描这些目录中的应用）
-const SYSTEM_DIRECTORIES = ['c:\\windows\\', 'c:\\windows\\system32\\', 'c:\\windows\\syswow64\\']
+export const SYSTEM_DIRECTORIES = [
+  'c:\\windows\\',
+  'c:\\windows\\system32\\',
+  'c:\\windows\\syswow64\\'
+]
 
 // ========== 辅助函数 ==========
 
 // 检查是否应该跳过该快捷方式
 // 优先基于目标文件的真实路径判断，而不是快捷方式名称
-function shouldSkipShortcut(name: string, targetPath?: string): boolean {
+export function shouldSkipShortcut(name: string, targetPath?: string): boolean {
   // 如果有目标路径，优先检查目标文件
   if (targetPath) {
     const lowerTargetPath = targetPath.toLowerCase()
@@ -94,9 +98,44 @@ function shouldSkipShortcut(name: string, targetPath?: string): boolean {
 }
 
 // 生成图标 URL
-function getIconUrl(appPath: string): string {
+export function getIconUrl(appPath: string): string {
   // 将绝对路径编码为 URL
   return `ztools-icon://${encodeURIComponent(appPath)}`
+}
+
+// 解析 .url 文件，提取 URL 和 IconFile 字段
+export interface UrlFileInfo {
+  url: string
+  iconFile: string
+}
+
+export async function parseUrlFile(filePath: string): Promise<UrlFileInfo | null> {
+  try {
+    const content = await fsPromises.readFile(filePath, 'utf-8')
+    let url = ''
+    let iconFile = ''
+
+    for (const line of content.split('\n')) {
+      const trimmed = line.trim()
+      if (trimmed.startsWith('URL=')) {
+        url = trimmed.slice(4)
+      } else if (trimmed.startsWith('IconFile=')) {
+        iconFile = trimmed.slice(9)
+      }
+    }
+
+    if (!url) return null
+
+    // 跳过普通网页链接（http/https），保留其他应用协议（如 steam://）
+    const lowerUrl = url.toLowerCase()
+    if (lowerUrl.startsWith('http://') || lowerUrl.startsWith('https://')) {
+      return null
+    }
+
+    return { url, iconFile }
+  } catch {
+    return null
+  }
 }
 
 // 递归扫描目录中的快捷方式
@@ -118,10 +157,35 @@ async function scanDirectory(dirPath: string, apps: Command[]): Promise<void> {
         continue
       }
 
-      // 只处理 .lnk 快捷方式文件
-      if (!entry.isFile() || !entry.name.endsWith('.lnk')) {
+      if (!entry.isFile()) continue
+
+      const ext = path.extname(entry.name).toLowerCase()
+
+      // 处理 .url 快捷方式（应用协议链接，如 steam://）
+      if (ext === '.url') {
+        const urlInfo = await parseUrlFile(fullPath)
+        if (!urlInfo) continue
+
+        const appName = path.basename(entry.name, '.url')
+
+        // 过滤检查
+        if (SKIP_NAME_PATTERN.test(appName)) continue
+
+        // 图标：优先使用 .url 文件中的 IconFile，否则使用 .url 文件本身
+        const iconPath = urlInfo.iconFile || fullPath
+        const icon = getIconUrl(iconPath)
+
+        apps.push({
+          name: appName,
+          path: urlInfo.url, // 使用协议链接作为启动路径
+          icon,
+          acronym: extractAcronym(appName)
+        })
         continue
       }
+
+      // 处理 .lnk 快捷方式
+      if (ext !== '.lnk') continue
 
       // 处理快捷方式
       const appName = path.basename(entry.name, '.lnk')
@@ -136,18 +200,40 @@ async function scanDirectory(dirPath: string, apps: Command[]): Promise<void> {
 
       // 获取目标路径和应用路径
       const targetPath = shortcutDetails?.target?.trim() || ''
+
+      // 如果 .lnk 指向 .url 文件，解析 .url 内容判断是否为应用协议
+      if (targetPath.toLowerCase().endsWith('.url')) {
+        const urlInfo = await parseUrlFile(targetPath)
+        if (!urlInfo) continue // http/https 或解析失败，跳过
+
+        if (SKIP_NAME_PATTERN.test(appName)) continue
+
+        const iconPath = urlInfo.iconFile || fullPath
+        const icon = getIconUrl(iconPath)
+
+        apps.push({
+          name: appName,
+          path: urlInfo.url,
+          icon,
+          acronym: extractAcronym(appName)
+        })
+        continue
+      }
+
       // 如果目标路径存在且文件存在，使用目标路径；否则使用 .lnk 文件本身
       let appPath = fullPath
-      let iconPath = fullPath // 图标提取路径，默认为快捷方式
+      // 图标优先级：快捷方式自定义图标 > 目标文件 > 快捷方式本身
+      // 解决同路径不同名应用（如米哈游各游戏）显示相同图标的问题
+      let iconPath = shortcutDetails?.icon || fullPath
 
       if (targetPath) {
         const fs = await import('fs')
         if (fs.existsSync(targetPath)) {
           appPath = targetPath
-          iconPath = targetPath // 目标存在时，从目标提取图标
-        } else {
-          // 目标不存在时，尝试从快捷方式的图标路径提取
-          iconPath = shortcutDetails?.icon || fullPath
+          // 仅当快捷方式没有自定义图标时，才使用目标文件的图标
+          if (!shortcutDetails?.icon) {
+            iconPath = targetPath
+          }
         }
       }
 
@@ -174,29 +260,35 @@ async function scanDirectory(dirPath: string, apps: Command[]): Promise<void> {
   }
 }
 
+/**
+ * 去重：按名称+路径的组合去重（允许不同名但同路径的应用共存）
+ */
+export function deduplicateCommands(apps: Command[]): Command[] {
+  const uniqueApps = new Map<string, Command>()
+  apps.forEach((app) => {
+    const dedupeKey = `${app.name.toLowerCase()}|${app.path.toLowerCase()}`
+    if (!uniqueApps.has(dedupeKey)) {
+      uniqueApps.set(dedupeKey, app)
+    }
+  })
+  return Array.from(uniqueApps.values())
+}
+
 export async function scanApplications(): Promise<Command[]> {
   try {
     const startTime = performance.now()
 
     const apps: Command[] = []
 
-    // 获取 Windows 开始菜单路径
-    const startMenuPaths = getWindowsStartMenuPaths()
+    // 获取 Windows 扫描路径（开始菜单 + 桌面）
+    const scanPaths = getWindowsScanPaths()
 
-    // 扫描所有开始菜单目录
-    for (const menuPath of startMenuPaths) {
+    // 扫描所有目录
+    for (const menuPath of scanPaths) {
       await scanDirectory(menuPath, apps)
     }
 
-    // 去重：按路径的小写形式去重（Windows 不区分大小写）
-    const uniqueApps = new Map<string, Command>()
-    apps.forEach((app) => {
-      const lowerPath = app.path.toLowerCase()
-      if (!uniqueApps.has(lowerPath)) {
-        uniqueApps.set(lowerPath, app)
-      }
-    })
-    const deduplicatedApps = Array.from(uniqueApps.values())
+    const deduplicatedApps = deduplicateCommands(apps)
 
     const endTime = performance.now()
     console.log(

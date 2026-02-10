@@ -4,6 +4,11 @@ import { pinyin } from 'pinyin-pro'
 import { ref } from 'vue'
 import arrowBackwardIcon from '../assets/image/arrow-backward.png'
 import settingsFillIcon from '../assets/image/settings-fill.png'
+import {
+  getCommandId as _getCommandId,
+  applySpecialConfig as _applySpecialConfig,
+  calculateMatchScore as _calculateMatchScore
+} from './commandUtils'
 
 // 正则匹配指令
 interface RegexCmd {
@@ -129,22 +134,7 @@ export const useCommandDataStore = defineStore('commandData', () => {
    * @returns 应用了特殊配置的指令
    */
   function applySpecialConfig(command: Command): Command {
-    // 1. 优先通过 path 精确匹配
-    const pathConfig = specialCommands[command.path]
-    if (pathConfig) {
-      return { ...command, ...pathConfig }
-    }
-
-    // 2. 通过 subType 匹配
-    if (command.subType) {
-      const subTypeKey = `subType:${command.subType}`
-      const subTypeConfig = specialCommands[subTypeKey]
-      if (subTypeConfig) {
-        return { ...command, ...subTypeConfig }
-      }
-    }
-
-    return command
+    return _applySpecialConfig(command, specialCommands)
   }
 
   // 历史记录
@@ -167,8 +157,7 @@ export const useCommandDataStore = defineStore('commandData', () => {
   // 生成指令唯一标识（与设置插件保持一致）
   // 格式: pluginName:featureCode:cmdName:cmdType
   function getCommandId(cmd: Command): string {
-    const cmdType = cmd.cmdType || 'text'
-    return `${cmd.pluginName || ''}:${cmd.featureCode || ''}:${cmd.name}:${cmdType}`
+    return _getCommandId(cmd)
   }
 
   // 检查指令是否被禁用
@@ -562,42 +551,7 @@ export const useCommandDataStore = defineStore('commandData', () => {
    * @returns 分数（越高越好）
    */
   function calculateMatchScore(text: string, query: string, matches?: MatchInfo[]): number {
-    if (!matches || matches.length === 0) return 0
-
-    let score = 0
-    const lowerText = text.toLowerCase()
-    const lowerQuery = query.toLowerCase()
-
-    // 1. 完全匹配（最高优先级）
-    if (lowerText === lowerQuery) {
-      return 10000
-    }
-
-    // 2. 前缀匹配（次高优先级）
-    if (lowerText.startsWith(lowerQuery)) {
-      score += 5000
-    }
-
-    // 3. 连续匹配检测
-    const consecutiveMatch = lowerText.includes(lowerQuery)
-    if (consecutiveMatch) {
-      score += 2000
-      // 连续匹配位置越靠前，分数越高
-      const position = lowerText.indexOf(lowerQuery)
-      score += Math.max(0, 500 - position * 10)
-    }
-
-    // 4. 匹配长度占比（匹配越多，分数越高）
-    const matchRatio = query.length / text.length
-    score += matchRatio * 100
-
-    // 5. 匹配位置（越靠前越好）
-    if (matches.length > 0 && matches[0].indices && matches[0].indices.length > 0) {
-      const firstMatchPosition = matches[0].indices[0][0]
-      score += Math.max(0, 100 - firstMatchPosition)
-    }
-
-    return score
+    return _calculateMatchScore(text, query, matches)
   }
 
   // 搜索
@@ -947,8 +901,12 @@ export const useCommandDataStore = defineStore('commandData', () => {
   }
 
   // 从历史记录中删除指定指令（通过后端 API）
-  async function removeFromHistory(commandPath: string, featureCode?: string): Promise<void> {
-    await window.ztools.removeFromHistory(commandPath, featureCode)
+  async function removeFromHistory(
+    commandPath: string,
+    featureCode?: string,
+    name?: string
+  ): Promise<void> {
+    await window.ztools.removeFromHistory(commandPath, featureCode, name)
     // 后端会发送 history-changed 事件，触发重新加载
   }
 
@@ -972,12 +930,16 @@ export const useCommandDataStore = defineStore('commandData', () => {
     }
   }
 
-  // 检查指令是否已固定
-  function isPinned(commandPath: string, featureCode?: string): boolean {
+  // 检查指令是否已固定（非插件类型需要同时匹配 name 和 path，支持同路径不同名应用）
+  function isPinned(commandPath: string, featureCode?: string, name?: string): boolean {
     return pinnedCommands.value.some((cmd) => {
       // 对于插件，需要同时匹配 path 和 featureCode
       if (cmd.type === 'plugin' && featureCode !== undefined) {
         return cmd.path === commandPath && cmd.featureCode === featureCode
+      }
+      // 非插件类型：同时匹配 name 和 path
+      if (name) {
+        return cmd.path === commandPath && cmd.name === name
       }
       return cmd.path === commandPath
     })
@@ -992,8 +954,12 @@ export const useCommandDataStore = defineStore('commandData', () => {
   }
 
   // 取消固定
-  async function unpinCommand(commandPath: string, featureCode?: string): Promise<void> {
-    await window.ztools.unpinApp(commandPath, featureCode)
+  async function unpinCommand(
+    commandPath: string,
+    featureCode?: string,
+    name?: string
+  ): Promise<void> {
+    await window.ztools.unpinApp(commandPath, featureCode, name)
     // 后端会发送 pinned-changed 事件，触发重新加载
   }
 

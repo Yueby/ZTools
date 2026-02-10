@@ -8,6 +8,7 @@ import { pluginFeatureAPI } from '../plugin/feature'
 import databaseAPI from '../shared/database'
 import pluginsAPI from './plugins'
 import { executeSystemCommand } from './systemCommands'
+import { findCommandIndex, filterOutCommand, hasCommand } from './commandMatchers'
 import { systemSettingsAPI } from './systemSettings'
 
 /**
@@ -51,14 +52,18 @@ export class AppsAPI {
     ipcMain.handle('refresh-apps-cache', () => this.refreshAppsCache())
 
     // 历史记录管理
-    ipcMain.handle('remove-from-history', (_event, appPath: string, featureCode?: string) =>
-      this.removeFromHistory(appPath, featureCode)
+    ipcMain.handle(
+      'remove-from-history',
+      (_event, appPath: string, featureCode?: string, name?: string) =>
+        this.removeFromHistory(appPath, featureCode, name)
     )
 
     // 固定应用管理
     ipcMain.handle('pin-app', (_event, app: any) => this.pinApp(app))
-    ipcMain.handle('unpin-app', (_event, appPath: string, featureCode?: string) =>
-      this.unpinApp(appPath, featureCode)
+    ipcMain.handle(
+      'unpin-app',
+      (_event, appPath: string, featureCode?: string, name?: string) =>
+        this.unpinApp(appPath, featureCode, name)
     )
     ipcMain.handle('update-pinned-order', (_event, newOrder: any[]) =>
       this.updatePinnedOrder(newOrder)
@@ -329,8 +334,10 @@ export class AppsAPI {
         return { success: true }
       } else {
         // 直接启动（app 或 system-setting 或 local-shortcut）
-        if (appPath.startsWith('ms-settings:')) {
-          // 系统设置
+        // 检查是否是协议链接（如 ms-settings:, steam://, battlenet:// 等）
+        const isProtocolLink =
+          /^[a-zA-Z][a-zA-Z0-9+\-.]*:/.test(appPath) && !appPath.includes('\\')
+        if (isProtocolLink) {
           await shell.openExternal(appPath)
         } else {
           // 检查是否为本地启动项
@@ -485,13 +492,8 @@ export class AppsAPI {
       // 读取历史记录
       let history: any[] = (await databaseAPI.dbGet('command-history')) || []
 
-      // 查找是否已存在
-      const existingIndex = history.findIndex((item) => {
-        if (item.type === 'plugin' && type === 'plugin') {
-          return item.path === appPath && item.featureCode === featureCode
-        }
-        return item.path === appPath
-      })
+      // 查找是否已存在（非插件类型需要同时匹配 name 和 path，支持同路径不同名应用）
+      const existingIndex = findCommandIndex(history, appPath, type, featureCode, appInfo.name)
 
       if (existingIndex >= 0) {
         // 已存在，更新使用时间和次数
@@ -548,13 +550,14 @@ export class AppsAPI {
       // 读取使用统计
       const stats: any[] = (await databaseAPI.dbGet('command-usage-stats')) || []
 
-      // 查找是否已存在
-      const existingIndex = stats.findIndex((item) => {
-        if (item.type === 'plugin' && type === 'plugin') {
-          return item.path === cmdPath && item.featureCode === featureCode
-        }
-        return item.path === cmdPath
-      })
+      // 查找是否已存在（非插件类型需要同时匹配 name 和 path，支持同路径不同名应用）
+      const existingIndex = findCommandIndex(
+        stats,
+        cmdPath,
+        type,
+        featureCode,
+        cmdName || cmdPath
+      )
 
       if (existingIndex >= 0) {
         // 已存在，更新使用时间和次数
@@ -652,34 +655,16 @@ export class AppsAPI {
   /**
    * 从历史记录中删除
    */
-  private async removeFromHistory(appPath: string, featureCode?: string): Promise<void> {
+  private async removeFromHistory(
+    appPath: string,
+    featureCode?: string,
+    name?: string
+  ): Promise<void> {
     try {
       const originalHistory: any[] = (await databaseAPI.dbGet('command-history')) || []
 
-      console.log('删除前历史记录数量:', originalHistory.length)
-      console.log('要删除的 path:', appPath)
-      console.log('要删除的 featureCode:', featureCode)
-
-      // 打印所有历史记录的 path，方便对比
-      console.log('历史记录中的所有 path:')
-      originalHistory.forEach((item, index) => {
-        console.log(`  [${index}] ${item.name}: ${item.path}`)
-      })
-
-      // 过滤掉要删除的项
-      const history = originalHistory.filter((item) => {
-        // 对于插件，需要同时匹配 path 和 featureCode
-        if (item.type === 'plugin' && featureCode !== undefined) {
-          return !(item.path === appPath && item.featureCode === featureCode)
-        }
-        const shouldKeep = item.path !== appPath
-        if (!shouldKeep) {
-          console.log('找到匹配项，将删除:', item.name, item.path)
-        }
-        return shouldKeep
-      })
-
-      console.log('删除后历史记录数量:', history.length)
+      // 过滤掉要删除的项（非插件类型需要同时匹配 name 和 path，支持同路径不同名应用）
+      const history = filterOutCommand(originalHistory, appPath, featureCode, name)
 
       await databaseAPI.dbPut('command-history', history)
       console.log('已从历史记录删除:', appPath, featureCode)
@@ -698,14 +683,8 @@ export class AppsAPI {
     try {
       const pinnedApps: any[] = (await databaseAPI.dbGet('pinned-commands')) || []
 
-      // 检查是否已固定
-      const exists = pinnedApps.some((item) => {
-        // 对于插件，需要同时匹配 path 和 featureCode
-        if (item.type === 'plugin' && app.featureCode !== undefined) {
-          return item.path === app.path && item.featureCode === app.featureCode
-        }
-        return item.path === app.path
-      })
+      // 检查是否已固定（非插件类型需要同时匹配 name 和 path，支持同路径不同名应用）
+      const exists = hasCommand(pinnedApps, app.path, app.featureCode, app.name)
 
       if (exists) {
         console.log('应用已固定:', app.path)
@@ -738,18 +717,12 @@ export class AppsAPI {
   /**
    * 取消固定
    */
-  private async unpinApp(appPath: string, featureCode?: string): Promise<void> {
+  private async unpinApp(appPath: string, featureCode?: string, name?: string): Promise<void> {
     try {
       const originalPinnedApps: any[] = (await databaseAPI.dbGet('pinned-commands')) || []
 
-      // 过滤掉要删除的项
-      const pinnedApps = originalPinnedApps.filter((item) => {
-        // 对于插件，需要同时匹配 path 和 featureCode
-        if (item.type === 'plugin' && featureCode !== undefined) {
-          return !(item.path === appPath && item.featureCode === featureCode)
-        }
-        return item.path !== appPath
-      })
+      // 过滤掉要删除的项（非插件类型需要同时匹配 name 和 path，支持同路径不同名应用）
+      const pinnedApps = filterOutCommand(originalPinnedApps, appPath, featureCode, name)
 
       await databaseAPI.dbPut('pinned-commands', pinnedApps)
       console.log('已取消固定:', appPath, featureCode)

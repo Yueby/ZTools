@@ -3,7 +3,7 @@ import { BrowserWindow } from 'electron'
 import fs from 'fs'
 import path from 'path'
 import appsAPI from './api/renderer/commands'
-import { getMacApplicationPaths, getWindowsStartMenuPaths } from './utils/systemPaths'
+import { getMacApplicationPaths, getWindowsScanPaths } from './utils/systemPaths'
 
 // 要跳过的文件夹名称
 const SKIP_FOLDERS = [
@@ -34,7 +34,7 @@ class AppWatcher {
   // 获取监听路径
   private getWatchPaths(): string[] {
     if (process.platform === 'win32') {
-      return getWindowsStartMenuPaths()
+      return getWindowsScanPaths()
     }
 
     if (process.platform === 'darwin') {

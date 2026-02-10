@@ -50,12 +50,12 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { useNavigation } from '../../composables/useNavigation'
+import { useSearchResults } from '../../composables/useSearchResults'
 import { useCommandDataStore } from '../../stores/commandDataStore'
 import { useWindowStore } from '../../stores/windowStore'
-import { useSearchResults } from '../../composables/useSearchResults'
-import { useNavigation } from '../../composables/useNavigation'
-import AggregateView from './AggregateView.vue'
 import VerticalList from '../common/VerticalList.vue'
+import AggregateView from './AggregateView.vue'
 
 // MatchFile 接口（传递给插件的文件格式）
 interface MatchFile {
@@ -417,13 +417,14 @@ async function handleAppContextMenu(
   // 只在历史记录中显示"从使用记录删除"
   if (!fromSearch && !fromPinned) {
     menuItems.push({
-      id: `remove-from-history:${JSON.stringify({ path: app.path, featureCode: app.featureCode })}`,
+      id: `remove-from-history:${JSON.stringify({ path: app.path, featureCode: app.featureCode, name: app.name })}`,
       label: '从使用记录删除'
     })
   }
 
-  // 如果是应用（不是插件和系统设置），显示"打开文件位置"
-  if (app.type !== 'system-setting' && app.type !== 'plugin' && app.path) {
+  // 如果是应用（不是插件和系统设置，且不是协议链接），显示"打开文件位置"
+  const isProtocolLink = /^[a-zA-Z][a-zA-Z0-9+\-.]*:/.test(app.path) && !app.path.includes('\\')
+  if (app.type !== 'system-setting' && app.type !== 'plugin' && app.path && !isProtocolLink) {
     menuItems.push({
       id: `reveal-in-finder:${JSON.stringify({ path: app.path })}`,
       label: '打开文件位置'
@@ -431,9 +432,9 @@ async function handleAppContextMenu(
   }
 
   // 根据是否已固定显示不同选项
-  if (isPinned(app.path, app.featureCode)) {
+  if (isPinned(app.path, app.featureCode, app.name)) {
     menuItems.push({
-      id: `unpin-app:${JSON.stringify({ path: app.path, featureCode: app.featureCode })}`,
+      id: `unpin-app:${JSON.stringify({ path: app.path, featureCode: app.featureCode, name: app.name })}`,
       label: '取消固定'
     })
   } else {
@@ -619,8 +620,8 @@ async function handleContextMenuCommand(command: string): Promise<void> {
   if (command.startsWith('remove-from-history:')) {
     const jsonStr = command.replace('remove-from-history:', '')
     try {
-      const { path, featureCode } = JSON.parse(jsonStr)
-      await removeFromHistory(path, featureCode)
+      const { path, featureCode, name } = JSON.parse(jsonStr)
+      await removeFromHistory(path, featureCode, name)
       nextTick(() => {
         emit('height-changed')
         emit('focus-input')
@@ -643,8 +644,8 @@ async function handleContextMenuCommand(command: string): Promise<void> {
   } else if (command.startsWith('unpin-app:')) {
     const jsonStr = command.replace('unpin-app:', '')
     try {
-      const { path, featureCode } = JSON.parse(jsonStr)
-      await unpinCommand(path, featureCode)
+      const { path, featureCode, name } = JSON.parse(jsonStr)
+      await unpinCommand(path, featureCode, name)
       nextTick(() => {
         emit('height-changed')
         emit('focus-input')

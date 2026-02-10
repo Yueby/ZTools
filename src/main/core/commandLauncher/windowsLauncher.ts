@@ -54,14 +54,15 @@ export async function launchApp(
     }
   }
 
-  // 检查是否是系统设置 URI
-  if (appPath.startsWith('ms-settings:')) {
+  // 检查是否是协议链接（如 ms-settings:, steam://, battlenet:// 等）
+  // 协议链接必须使用 shell.openExternal()，shell.openPath() 会卡住
+  if (/^[a-zA-Z][a-zA-Z0-9+\-.]*:/.test(appPath) && !appPath.includes('\\')) {
     try {
       await shell.openExternal(appPath)
-      console.log(`成功打开系统设置: ${appPath}`)
+      console.log(`成功打开协议链接: ${appPath}`)
       return
     } catch (error) {
-      console.error('打开系统设置失败:', error)
+      console.error('打开协议链接失败:', error)
       throw error
     }
   }
