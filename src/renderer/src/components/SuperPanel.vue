@@ -142,6 +142,77 @@ const iconErrors = ref<Set<string>>(new Set())
 const currentClipboardContent = ref<ClipboardContent | null>(null)
 // 头像（默认使用内置头像）
 const avatar = ref(defaultAvatar)
+const acrylicLightOpacity = ref(78)
+const acrylicDarkOpacity = ref(50)
+const primaryColor = ref('blue')
+const customColor = ref('#db2777')
+
+function getThemeColor(colorName: string, isDark: boolean): string {
+  const colors: Record<string, { light: string; dark: string }> = {
+    blue: { light: '#0284c7', dark: '#38bdf8' },
+    purple: { light: '#7c3aed', dark: '#a78bfa' },
+    green: { light: '#059669', dark: '#34d399' },
+    orange: { light: '#ea580c', dark: '#fb923c' },
+    red: { light: '#dc2626', dark: '#f87171' },
+    pink: { light: '#db2777', dark: '#f472b6' }
+  }
+  const color = colors[colorName]
+  if (color) {
+    return isDark ? color.dark : color.light
+  }
+  return isDark ? '#38bdf8' : '#0284c7'
+}
+
+function applyPrimaryColor(): void {
+  const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+  let colorValue = ''
+
+  if (primaryColor.value === 'custom') {
+    colorValue = customColor.value
+  } else {
+    colorValue = getThemeColor(primaryColor.value, isDark)
+  }
+
+  document.documentElement.style.setProperty('--primary-color', colorValue)
+}
+
+function applyAcrylicOverlay(): void {
+  const existingStyle = document.getElementById('acrylic-overlay-style')
+  if (existingStyle) {
+    existingStyle.remove()
+  }
+
+  const material = document.documentElement.getAttribute('data-material')
+
+  if (material === 'acrylic') {
+    const style = document.createElement('style')
+    style.id = 'acrylic-overlay-style'
+    style.textContent = `
+      body::after {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: -1;
+      }
+
+      /* 明亮模式 */
+      @media (prefers-color-scheme: light) {
+        body::after {
+          background: rgb(255 255 255 / ${acrylicLightOpacity.value}%);
+        }
+      }
+
+      /* 暗黑模式 */
+      @media (prefers-color-scheme: dark) {
+        body::after {
+          background: rgb(0 0 0 / ${acrylicDarkOpacity.value}%);
+        }
+      }
+    `
+    document.head.appendChild(style)
+  }
+}
 
 // 剪贴板内容描述
 const clipboardDescription = computed(() => {
@@ -337,17 +408,75 @@ onMounted(() => {
   // 通知主进程窗口已准备好
   window.ztools.superPanelReady()
 
-  // 加载头像
+  // 加载设置（头像、亚克力透明度、主题色）
   window.ztools
     .dbGet('settings-general')
     .then((settings) => {
       if (settings?.avatar) {
         avatar.value = settings.avatar
       }
+      if (settings) {
+        acrylicLightOpacity.value = settings.acrylicLightOpacity ?? 78
+        acrylicDarkOpacity.value = settings.acrylicDarkOpacity ?? 50
+        if (settings.primaryColor) {
+          primaryColor.value = settings.primaryColor
+        }
+        if (settings.customColor) {
+          customColor.value = settings.customColor
+        }
+        applyPrimaryColor()
+      }
     })
     .catch(() => {
       // ignore
     })
+
+  // 初始化时获取当前窗口材质
+  if (window.ztools?.getWindowMaterial) {
+    window.ztools
+      .getWindowMaterial()
+      .then((material: string) => {
+        document.documentElement.setAttribute('data-material', material)
+        applyAcrylicOverlay()
+      })
+      .catch((err: Error) => {
+        console.error('获取窗口材质失败:', err)
+      })
+  }
+
+  // 监听窗口材质更新
+  if (window.ztools?.onUpdateWindowMaterial) {
+    window.ztools.onUpdateWindowMaterial((material: 'mica' | 'acrylic' | 'none') => {
+      document.documentElement.setAttribute('data-material', material)
+      applyAcrylicOverlay()
+    })
+  }
+
+  // 监听亚克力透明度更新事件
+  if (window.ztools?.onUpdateAcrylicOpacity) {
+    window.ztools.onUpdateAcrylicOpacity((data: { lightOpacity: number; darkOpacity: number }) => {
+      acrylicLightOpacity.value = data.lightOpacity
+      acrylicDarkOpacity.value = data.darkOpacity
+      applyAcrylicOverlay()
+    })
+  }
+
+  // 监听主题色更新
+  if (window.ztools?.onUpdatePrimaryColor) {
+    window.ztools.onUpdatePrimaryColor((data: { primaryColor: string; customColor?: string }) => {
+      primaryColor.value = data.primaryColor
+      if (data.customColor) {
+        customColor.value = data.customColor
+      }
+      applyPrimaryColor()
+    })
+  }
+
+  // 监听系统主题变化
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    applyPrimaryColor()
+    applyAcrylicOverlay()
+  })
 
   // 监听头像更新事件
   window.ztools.onUpdateAvatar((newAvatar: string) => {
