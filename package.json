@@ -45,7 +45,6 @@
     "adm-zip": "^0.5.16",
     "chokidar": "^4.0.3",
     "electron-log": "^5.4.3",
-    "extract-file-icon": "^0.3.2",
     "fuse.js": "^7.0.0",
     "lmdb": "^3.4.4",
     "marked": "^17.0.1",
@@ -87,7 +86,6 @@
     "onlyBuiltDependencies": [
       "electron",
       "esbuild",
-      "extract-file-icon",
       "lmdb",
       "msgpackr-extract"
     ]

@@ -12,11 +12,9 @@ import { loadInternalPlugins } from './core/internalPluginLoader'
 
 import pluginManager from './managers/pluginManager'
 import windowManager from './managers/windowManager'
+import { IconExtractor } from './core/native/index'
 
 const execAsync = promisify(exec)
-
-// Windows 图标提取模块（延迟加载）
-let extractFileIcon: ((path: string, size?: 16 | 32 | 64 | 256) => Buffer) | null = null
 
 // Windows 平台需要设置 AppUserModelId 才能让单例锁正常工作
 if (process.platform === 'win32') {
@@ -145,22 +143,12 @@ export function registerIconProtocolForSession(targetSession: Electron.Session):
           }
         }
       } else {
-        // Windows: 动态导入 extract-file-icon 并实时提取
-        if (!extractFileIcon) {
-          try {
-            const module = await import('extract-file-icon')
-            extractFileIcon = module.default
-          } catch (error) {
-            console.error('加载 extract-file-icon 失败:', error)
-            throw new Error('extract-file-icon module not available')
-          }
+        // Windows: 使用原生模块提取图标
+        const iconBuffer = IconExtractor.getFileIcon(iconPath, 32)
+        if (!iconBuffer) {
+          throw new Error('Failed to extract icon')
         }
-
-        // 实时提取图标（同步操作，但速度很快）
-        if (!extractFileIcon) {
-          throw new Error('extract-file-icon not initialized')
-        }
-        buffer = extractFileIcon(iconPath, 32)
+        buffer = iconBuffer
       }
 
       // 写入内存缓存
