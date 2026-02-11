@@ -1,9 +1,13 @@
+import { execFile } from 'child_process'
 import { shell } from 'electron'
 import fsPromises from 'fs/promises'
 import path from 'path'
+import { promisify } from 'util'
 import { extractAcronym } from '../../utils/common'
 import { getWindowsScanPaths } from '../../utils/systemPaths'
 import { Command } from './types'
+
+const execFileAsync = promisify(execFile)
 
 // ========== 配置 ==========
 
@@ -21,80 +25,205 @@ export const SKIP_FOLDERS = [
   'documentation'
 ]
 
-// 要跳过的目标文件扩展名（文档、网页等，用于检查 .lnk 快捷方式的目标路径）
-// 注意：.url 不在此列表中，会单独解析内容判断是否为应用协议
-export const SKIP_EXTENSIONS = [
-  '.html', // 网页文件
-  '.htm',
-  '.pdf', // PDF文档
-  '.txt', // 文本文档
-  '.chm', // 帮助文件
-  '.doc', // Word文档
-  '.docx',
-  '.xls', // Excel文档
-  '.xlsx',
-  '.ppt', // PowerPoint文档
-  '.pptx',
-  '.md', // Markdown文档
-  '.msc' // 管理单元
-]
-
 // 要跳过的快捷方式名称关键词（不区分大小写）
+// 仅按名称过滤，不按目标类型/路径/扩展名过滤
+// 因为扫描范围仅限开始菜单和桌面，这些位置的快捷方式都是有意放置的
 export const SKIP_NAME_PATTERN =
   /^uninstall |^卸载|卸载$|website|网站|帮助|help|readme|read me|文档|manual|license|documentation/i
 
-// 要跳过的目标可执行文件名（卸载程序、安装程序等）
-// 卸载程序：uninst.exe, uninstall.exe, uninstaller.exe, UninstallXXX.exe, unins000.exe, unwise.exe, _uninst.exe 等
-// 安装程序：setup.exe, install.exe, installer.exe, InstallXXX.exe, instmsi.exe, instmsiw.exe 等
-// 注意：
-//   - 过滤所有以 "uninstall"/"install" 开头的（包括 Installer.exe, UninstallSpineTrial.exe 等）
-//   - 过滤 "uninst" 开头的（但 "unins" + 数字除外，需要精确匹配）
-//   - 保留配置工具（如 "GameSetup.exe"，不以 setup/install 开头）
-export const SKIP_TARGET_PATTERN =
-  /^uninstall|^uninst|^unins\d+$|^unwise|^_uninst|^setup$|^install|^instmsi|卸载程序|安装程序/i
-
-// Windows 系统目录（不应该扫描这些目录中的应用）
-export const SYSTEM_DIRECTORIES = [
-  'c:\\windows\\',
-  'c:\\windows\\system32\\',
-  'c:\\windows\\syswow64\\'
-]
-
 // ========== 辅助函数 ==========
 
-// 检查是否应该跳过该快捷方式
-// 优先基于目标文件的真实路径判断，而不是快捷方式名称
-export function shouldSkipShortcut(name: string, targetPath?: string): boolean {
-  // 如果有目标路径，优先检查目标文件
-  if (targetPath) {
-    const lowerTargetPath = targetPath.toLowerCase()
+// 检查是否应该跳过该快捷方式（仅按名称过滤）
+export function shouldSkipShortcut(name: string): boolean {
+  return SKIP_NAME_PATTERN.test(name)
+}
 
-    // 1. 检查是否在系统目录中（Windows、System32、WindowsApps 等）
-    if (SYSTEM_DIRECTORIES.some((sysDir) => lowerTargetPath.startsWith(sysDir))) {
-      return true
+/**
+ * 解析 desktop.ini 中的 [LocalizedFileNames] 段。
+ * desktop.ini 通常是 UTF-16LE 编码（带 BOM），部分为 UTF-8。
+ * 返回 { fileName → value } 的映射，value 可能是纯文本或 MUI 引用（@dll,-id）。
+ */
+async function parseDesktopIni(dirPath: string): Promise<Map<string, string>> {
+  const entries = new Map<string, string>()
+  const iniPath = path.join(dirPath, 'desktop.ini')
+
+  try {
+    const buf = await fsPromises.readFile(iniPath)
+    // 检测 BOM 来判断编码：FF FE = UTF-16LE，否则 UTF-8
+    const content =
+      buf.length >= 2 && buf[0] === 0xff && buf[1] === 0xfe
+        ? buf.toString('utf16le')
+        : buf.toString('utf8')
+
+    let inSection = false
+    for (const line of content.split(/\r?\n/)) {
+      const t = line.trim()
+      if (t === '[LocalizedFileNames]') {
+        inSection = true
+        continue
+      }
+      if (t.startsWith('[')) {
+        inSection = false
+        continue
+      }
+      if (inSection && t.includes('=')) {
+        const eqIdx = t.indexOf('=')
+        const fileName = t.slice(0, eqIdx)
+        const value = t.slice(eqIdx + 1)
+        if (fileName && value) {
+          entries.set(fileName, value)
+        }
+      }
     }
-
-    // 2. 检查目标文件扩展名（文档、网页等非可执行文件）
-    if (SKIP_EXTENSIONS.some((ext) => lowerTargetPath.endsWith(ext))) {
-      return true
-    }
-
-    // 3. 检查目标文件的文件名（uninst.exe, uninstall.exe, setup.exe 等）
-    const targetFileName = path.basename(targetPath, path.extname(targetPath))
-    if (SKIP_TARGET_PATTERN.test(targetFileName)) {
-      return true
-    }
-
-    // 目标路径检查通过，不过滤
-    return false
+  } catch {
+    // 文件不存在或无法读取，正常忽略
   }
 
-  // 如果没有目标路径（解析失败），降级检查快捷方式名称
-  if (SKIP_NAME_PATTERN.test(name)) {
-    return true
+  return entries
+}
+
+/**
+ * 批量解析 MUI 资源字符串（如 @%SystemRoot%\system32\shell32.dll,-22067）。
+ * 通过 PowerShell P/Invoke 调用 Win32 LoadLibraryEx + LoadString。
+ *
+ * 注意：SHLoadIndirectString 在子进程中 MUI 重定向会失效（始终返回英文），
+ * 所以必须手动查找 CurrentUICulture 对应的 .mui 文件再用 LoadString 加载。
+ */
+async function resolveMuiStrings(muiRefs: string[]): Promise<Map<string, string>> {
+  const resolved = new Map<string, string>()
+  if (muiRefs.length === 0) return resolved
+
+  // 将 MUI 引用作为 JSON 数组传入 PowerShell
+  const refsJson = JSON.stringify(muiRefs).replace(/'/g, "''")
+
+  const script = [
+    'Add-Type @"',
+    'using System; using System.Runtime.InteropServices; using System.Text;',
+    'using System.IO; using System.Globalization;',
+    'public class MuiResolver {',
+    '  [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)]',
+    '  static extern IntPtr LoadLibraryEx(string f, IntPtr h, uint d);',
+    '  [DllImport("user32.dll", CharSet=CharSet.Unicode)]',
+    '  static extern int LoadString(IntPtr h, uint id, StringBuilder sb, int n);',
+    '  [DllImport("kernel32.dll")] static extern bool FreeLibrary(IntPtr h);',
+    '  static string LoadFromDll(string p, uint id) {',
+    '    IntPtr h = LoadLibraryEx(p, IntPtr.Zero, 2); if (h==IntPtr.Zero) return null;',
+    '    var sb = new StringBuilder(1024); int len = LoadString(h,id,sb,sb.Capacity);',
+    '    FreeLibrary(h); return len>0 ? sb.ToString() : null; }',
+    '  public static string Resolve(string s) {',
+    '    if (string.IsNullOrEmpty(s)||!s.StartsWith("@")) return s;',
+    '    string r=s.Substring(1); int ci=r.LastIndexOf(","); if(ci<0) return null;',
+    '    string dll=Environment.ExpandEnvironmentVariables(r.Substring(0,ci));',
+    '    string ids=r.Substring(ci+1); uint id;',
+    '    if(ids.StartsWith("-")){if(!uint.TryParse(ids.Substring(1),out id))return null;}',
+    '    else{if(!uint.TryParse(ids,out id))return null;}',
+    '    string dir=Path.GetDirectoryName(dll), fn=Path.GetFileName(dll);',
+    '    string lang=CultureInfo.CurrentUICulture.Name;',
+    '    string mui=Path.Combine(dir,lang,fn+".mui");',
+    '    if(File.Exists(mui)){string v=LoadFromDll(mui,id);if(v!=null)return v;}',
+    '    var par=CultureInfo.CurrentUICulture.Parent;',
+    '    if(par!=null&&!string.IsNullOrEmpty(par.Name)){',
+    '      mui=Path.Combine(dir,par.Name,fn+".mui");',
+    '      if(File.Exists(mui)){string v=LoadFromDll(mui,id);if(v!=null)return v;}}',
+    '    return LoadFromDll(dll,id); } }',
+    '"@',
+    '[Console]::OutputEncoding=[System.Text.Encoding]::UTF8',
+    `$refs='${refsJson}'|ConvertFrom-Json`,
+    'foreach($r in $refs){$n=[MuiResolver]::Resolve($r)',
+    '  if($n){[Console]::Out.WriteLine("$r`t$n")}}'
+  ].join('\n')
+
+  const { stdout } = await execFileAsync(
+    'powershell.exe',
+    ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', script],
+    { encoding: 'utf8', timeout: 15000 }
+  )
+
+  for (const line of stdout.split('\n')) {
+    const trimmed = line.trim()
+    if (!trimmed) continue
+    const tabIdx = trimmed.indexOf('\t')
+    if (tabIdx > 0) {
+      const ref = trimmed.slice(0, tabIdx)
+      const name = trimmed.slice(tabIdx + 1)
+      if (ref && name) resolved.set(ref, name)
+    }
   }
 
-  return false
+  return resolved
+}
+
+/**
+ * 获取文件的本地化显示名称（Windows 特有）。
+ * Windows 系统快捷方式的磁盘文件名通常是英文（如 File Explorer.lnk），
+ * 但通过 desktop.ini + MUI 资源显示为本地化名称（如"文件资源管理器"）。
+ *
+ * 分两步：
+ * 1. Node.js 直接读取 desktop.ini（纯文件 I/O + 解析）
+ * 2. 遇到 MUI 引用（@dll,-id）时，批量交给 PowerShell 解析（Win32 API，不可避免）
+ */
+async function getLocalizedDisplayNames(dirPaths: string[]): Promise<Map<string, string>> {
+  const nameMap = new Map<string, string>()
+
+  if (process.platform !== 'win32') return nameMap
+
+  try {
+    // 第 1 步：用 Node.js 递归读取所有 desktop.ini，收集本地化条目
+    const pendingMui = new Map<string, string[]>() // muiRef → [fullPath, ...]
+
+    async function scanDir(dirPath: string): Promise<void> {
+      const iniEntries = await parseDesktopIni(dirPath)
+
+      for (const [fileName, value] of iniEntries) {
+        const fullPath = path.join(dirPath, fileName)
+        if (value.startsWith('@')) {
+          // MUI 引用，稍后批量解析
+          const arr = pendingMui.get(value) || []
+          arr.push(fullPath)
+          pendingMui.set(value, arr)
+        } else {
+          // 纯文本，直接使用
+          nameMap.set(fullPath.toLowerCase(), value)
+        }
+      }
+
+      // 递归子目录
+      try {
+        const entries = await fsPromises.readdir(dirPath, { withFileTypes: true })
+        for (const entry of entries) {
+          if (entry.isDirectory()) {
+            await scanDir(path.join(dirPath, entry.name))
+          }
+        }
+      } catch {
+        // 目录不可读，忽略
+      }
+    }
+
+    for (const dirPath of dirPaths) {
+      await scanDir(dirPath)
+    }
+
+    // 第 2 步：批量解析 MUI 引用（需要 Win32 API，通过 PowerShell P/Invoke）
+    if (pendingMui.size > 0) {
+      const muiRefs = Array.from(pendingMui.keys())
+      const resolved = await resolveMuiStrings(muiRefs)
+
+      for (const [ref, localizedName] of resolved) {
+        const filePaths = pendingMui.get(ref) || []
+        for (const fp of filePaths) {
+          nameMap.set(fp.toLowerCase(), localizedName)
+        }
+      }
+    }
+
+    console.log(`获取到 ${nameMap.size} 个本地化文件名映射`)
+  } catch (error) {
+    // 失败不影响扫描，降级使用磁盘文件名
+    console.error('获取本地化显示名称失败（将使用文件名）:', error)
+  }
+
+  return nameMap
 }
 
 // 生成图标 URL
@@ -139,7 +268,11 @@ export async function parseUrlFile(filePath: string): Promise<UrlFileInfo | null
 }
 
 // 递归扫描目录中的快捷方式
-async function scanDirectory(dirPath: string, apps: Command[]): Promise<void> {
+async function scanDirectory(
+  dirPath: string,
+  apps: Command[],
+  displayNameMap: Map<string, string>
+): Promise<void> {
   try {
     const entries = await fsPromises.readdir(dirPath, { withFileTypes: true })
 
@@ -153,7 +286,7 @@ async function scanDirectory(dirPath: string, apps: Command[]): Promise<void> {
           continue
         }
         // 递归扫描子目录
-        await scanDirectory(fullPath, apps)
+        await scanDirectory(fullPath, apps, displayNameMap)
         continue
       }
 
@@ -166,7 +299,8 @@ async function scanDirectory(dirPath: string, apps: Command[]): Promise<void> {
         const urlInfo = await parseUrlFile(fullPath)
         if (!urlInfo) continue
 
-        const appName = path.basename(entry.name, '.url')
+        // 优先使用本地化显示名称，降级为磁盘文件名
+        const appName = displayNameMap.get(fullPath.toLowerCase()) || path.basename(entry.name, '.url')
 
         // 过滤检查
         if (SKIP_NAME_PATTERN.test(appName)) continue
@@ -187,8 +321,9 @@ async function scanDirectory(dirPath: string, apps: Command[]): Promise<void> {
       // 处理 .lnk 快捷方式
       if (ext !== '.lnk') continue
 
-      // 处理快捷方式
-      const appName = path.basename(entry.name, '.lnk')
+      // 优先使用本地化显示名称，降级为磁盘文件名
+      // 解决 Windows 系统快捷方式文件名为英文（如 File Explorer.lnk）但显示名为中文的问题
+      const appName = displayNameMap.get(fullPath.toLowerCase()) || path.basename(entry.name, '.lnk')
 
       // 尝试解析快捷方式目标（必须先解析才能获取真实路径）
       let shortcutDetails: Electron.ShortcutDetails | null = null
@@ -220,37 +355,25 @@ async function scanDirectory(dirPath: string, apps: Command[]): Promise<void> {
         continue
       }
 
-      // 如果目标路径存在且文件存在，使用目标路径；否则使用 .lnk 文件本身
-      let appPath = fullPath
-      // 图标优先级：快捷方式自定义图标 > 目标文件 > 快捷方式本身
-      // 解决同路径不同名应用（如米哈游各游戏）显示相同图标的问题
-      let iconPath = shortcutDetails?.icon || fullPath
-
-      if (targetPath) {
-        const fs = await import('fs')
-        if (fs.existsSync(targetPath)) {
-          appPath = targetPath
-          // 仅当快捷方式没有自定义图标时，才使用目标文件的图标
-          if (!shortcutDetails?.icon) {
-            iconPath = targetPath
-          }
-        }
-      }
-
-      // 过滤检查：基于目标文件的真实路径判断（优先），或快捷方式名称（降级）
-      if (shouldSkipShortcut(appName, targetPath)) {
+      // 过滤检查：仅按名称过滤（不按目标类型/路径过滤）
+      if (shouldSkipShortcut(appName)) {
         continue
       }
 
-      // 生成图标 URL
-      const icon = getIconUrl(iconPath)
+      // 始终使用 .lnk 快捷方式路径作为启动路径
+      // Windows Shell API (shell.openPath) 能正确处理 .lnk 文件的启动（包括参数、工作目录等）
+      // 图标使用 .lnk 路径即可，SHGetFileInfoW 能正确解析快捷方式的图标（包括自定义图标）
+      const icon = getIconUrl(fullPath)
 
       // 创建应用对象
-      const app: Command = {
+      // _dedupeTarget 用于去重：同名且指向同一目标的快捷方式只保留一个
+      // （用户开始菜单和系统开始菜单可能有同名同目标的 .lnk，路径不同但应合并）
+      const app: Command & { _dedupeTarget?: string } = {
         name: appName,
-        path: appPath,
+        path: fullPath,
         icon,
-        acronym: extractAcronym(appName)
+        acronym: extractAcronym(appName),
+        _dedupeTarget: targetPath || undefined
       }
 
       apps.push(app)
@@ -261,14 +384,20 @@ async function scanDirectory(dirPath: string, apps: Command[]): Promise<void> {
 }
 
 /**
- * 去重：按名称+路径的组合去重（允许不同名但同路径的应用共存）
+ * 去重：按名称+目标路径的组合去重（允许不同名但同目标的应用共存）
+ * 对于 .lnk 快捷方式，使用 _dedupeTarget（目标路径）而非 .lnk 路径去重
+ * 这样同名同目标但位于不同目录（用户/系统开始菜单）的快捷方式只保留一个
  */
-export function deduplicateCommands(apps: Command[]): Command[] {
+export function deduplicateCommands(apps: (Command & { _dedupeTarget?: string })[]): Command[] {
   const uniqueApps = new Map<string, Command>()
   apps.forEach((app) => {
-    const dedupeKey = `${app.name.toLowerCase()}|${app.path.toLowerCase()}`
+    // 优先使用 _dedupeTarget（快捷方式的目标路径）去重，降级为 path
+    const dedupeTarget = app._dedupeTarget || app.path
+    const dedupeKey = `${app.name.toLowerCase()}|${dedupeTarget.toLowerCase()}`
     if (!uniqueApps.has(dedupeKey)) {
-      uniqueApps.set(dedupeKey, app)
+      // 清除内部去重字段，不泄漏到外部
+      const { _dedupeTarget, ...cleanApp } = app
+      uniqueApps.set(dedupeKey, cleanApp)
     }
   })
   return Array.from(uniqueApps.values())
@@ -283,9 +412,12 @@ export async function scanApplications(): Promise<Command[]> {
     // 获取 Windows 扫描路径（开始菜单 + 桌面）
     const scanPaths = getWindowsScanPaths()
 
+    // 获取本地化显示名称（解决 Windows 系统快捷方式文件名为英文的问题）
+    const displayNameMap = await getLocalizedDisplayNames(scanPaths)
+
     // 扫描所有目录
     for (const menuPath of scanPaths) {
-      await scanDirectory(menuPath, apps)
+      await scanDirectory(menuPath, apps, displayNameMap)
     }
 
     const deduplicatedApps = deduplicateCommands(apps)

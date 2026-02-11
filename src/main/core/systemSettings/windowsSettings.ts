@@ -52,11 +52,6 @@ const allSettings: Omit<SystemSetting, 'icon'>[] = [
     category: '应用'
   },
   {
-    name: '控制面板',
-    uri: 'control.exe',
-    category: '系统'
-  },
-  {
     name: '鼠标属性',
     uri: 'main.cpl',
     category: '设备'

@@ -1,5 +1,6 @@
 <template>
   <img
+    ref="imgRef"
     :src="src"
     :class="['adaptive-icon', adaptiveClass]"
     :style="adaptiveStyle"
@@ -9,8 +10,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
-import { useColorScheme } from '../../composables/useColorScheme'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { useColorScheme } from '../../composables/useColorScheme';
 
 const props = defineProps<{
   src: string
@@ -23,6 +24,7 @@ const emit = defineEmits<{
 }>()
 
 const { isDark } = useColorScheme()
+const imgRef = ref<HTMLImageElement | null>(null)
 const analysisResult = ref<{
   isSimpleIcon: boolean
   mainColor: string | null
@@ -31,6 +33,8 @@ const analysisResult = ref<{
 } | null>(null)
 
 const isAnalyzing = ref(false)
+const isVisible = ref(false)
+let observer: IntersectionObserver | null = null
 
 // 分析图片
 async function analyzeImage(): Promise<void> {
@@ -45,6 +49,13 @@ async function analyzeImage(): Promise<void> {
     analysisResult.value = null
   } finally {
     isAnalyzing.value = false
+  }
+}
+
+// 仅在可见时触发分析
+function analyzeIfVisible(): void {
+  if (isVisible.value) {
+    analyzeImage()
   }
 }
 
@@ -85,20 +96,40 @@ function onError(event: Event): void {
   emit('error', event)
 }
 
-// 监听 src 变化，重新分析
+// 监听 src 变化，重置分析结果，仅在可见时重新分析
 watch(
   () => props.src,
   () => {
     analysisResult.value = null
-    analyzeImage()
-  },
-  { immediate: true }
+    analyzeIfVisible()
+  }
 )
 
 onMounted(() => {
-  if (props.src) {
-    analyzeImage()
-  }
+  if (!imgRef.value) return
+
+  observer = new IntersectionObserver(
+    (entries) => {
+      const entry = entries[0]
+      if (entry?.isIntersecting) {
+        isVisible.value = true
+        // 进入视口时触发分析（如果尚未分析）
+        if (!analysisResult.value && props.src) {
+          analyzeImage()
+        }
+      } else {
+        isVisible.value = false
+      }
+    },
+    { rootMargin: '100px' } // 提前 100px 开始分析，减少闪烁
+  )
+
+  observer.observe(imgRef.value)
+})
+
+onUnmounted(() => {
+  observer?.disconnect()
+  observer = null
 })
 </script>
 

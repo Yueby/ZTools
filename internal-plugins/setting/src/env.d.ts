@@ -177,6 +177,7 @@ declare global {
         getCommands: () => Promise<{
           commands: any[]
           regexCommands: any[]
+          plugins: any[]
         }>
 
         // 本地启动管理

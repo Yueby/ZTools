@@ -1,7 +1,13 @@
 <template>
   <div class="all-commands-container">
+    <!-- 加载状态 -->
+    <div v-if="loading" class="loading-overlay">
+      <div class="loading-spinner"></div>
+      <span class="loading-text">加载指令数据...</span>
+    </div>
+
     <!-- 左侧：来源列表 -->
-    <div class="sources-panel">
+    <div v-show="!loading" class="sources-panel">
       <div class="panel-header">
         <h3>指令来源</h3>
       </div>
@@ -76,7 +82,7 @@
     </div>
 
     <!-- 右侧：指令详情 -->
-    <div class="commands-panel">
+    <div v-show="!loading" class="commands-panel">
       <!-- 头部 -->
       <div class="panel-header">
         <!-- Tab 切换 -->
@@ -252,6 +258,7 @@ interface Source {
 }
 
 // 本地状态：指令数据
+const loading = ref(true)
 const commands = ref<Command[]>([])
 const regexCommands = ref<Command[]>([])
 
@@ -649,28 +656,36 @@ const matchFeaturesCount = computed(() => {
   return groupedFeatures.value.filter((f) => f.matchCmds.length > 0).length
 })
 
-// 获取插件指令数量（功能指令 + 匹配指令）
+// 预计算每个插件的指令数量（一次遍历，避免 N 次全量 filter）
+const pluginCommandCountMap = computed(() => {
+  const map = new Map<string, number>()
+  for (const c of allCommands.value) {
+    if (c.type === 'plugin' && c.featureCode && c.path) {
+      map.set(c.path, (map.get(c.path) || 0) + 1)
+    }
+  }
+  for (const c of allRegexCommands.value) {
+    if (c.featureCode && c.path) {
+      map.set(c.path, (map.get(c.path) || 0) + 1)
+    }
+  }
+  return map
+})
+
 function getPluginCommandCount(plugin: any): number {
-  // 统计功能指令数量
-  const textCommandCount = allCommands.value.filter(
-    (c) => c.type === 'plugin' && c.path === plugin.path && c.featureCode
-  ).length
-
-  // 统计匹配指令数量
-  const matchCommandCount = allRegexCommands.value.filter(
-    (c) => c.path === plugin.path && c.featureCode
-  ).length
-
-  // 返回总指令数量
-  return textCommandCount + matchCommandCount
+  return pluginCommandCountMap.value.get(plugin.path) || 0
 }
 
-// 加载指令数据
+// 加载指令数据（包含 commands、regexCommands、plugins）
 async function loadCommands(): Promise<void> {
   try {
     const result = await window.ztools.internal.getCommands()
     commands.value = result.commands
     regexCommands.value = result.regexCommands
+    // 直接使用 getCommands 返回的 plugins，避免额外 IPC 请求
+    if (result.plugins) {
+      plugins.value = result.plugins
+    }
   } catch (error) {
     console.error('加载指令数据失败:', error)
   }
@@ -684,17 +699,18 @@ function selectSource(source: Source): void {
 
 // 初始化
 onMounted(async () => {
-  // 加载禁用指令列表
-  await loadDisabledCommands()
-  // 加载超级面板固定列表
-  await loadSuperPanelPinned()
-  // 加载指令数据
-  await loadCommands()
-  // 加载插件列表（包括内置插件）
-  plugins.value = await window.ztools.internal.getAllPlugins()
-  // 默认选中系统应用
-  if (appCount.value > 0) {
-    selectSource({ subType: 'app', name: '系统应用' })
+  loading.value = true
+  try {
+    // 并行加载禁用指令和超级面板固定列表（互不依赖）
+    await Promise.all([loadDisabledCommands(), loadSuperPanelPinned()])
+    // 加载指令数据（内含 plugins，无需再单独请求）
+    await loadCommands()
+    // 默认选中系统应用
+    if (appCount.value > 0) {
+      selectSource({ subType: 'app', name: '系统应用' })
+    }
+  } finally {
+    loading.value = false
   }
 })
 </script>
@@ -704,6 +720,37 @@ onMounted(async () => {
   display: flex;
   height: 100%;
   background: var(--bg-color);
+}
+
+/* === 加载状态 === */
+.loading-overlay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  gap: 12px;
+}
+
+.loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--divider-color);
+  border-top-color: var(--primary-color);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.loading-text {
+  font-size: 13px;
+  color: var(--text-color-secondary);
 }
 
 /* === 左侧面板 === */

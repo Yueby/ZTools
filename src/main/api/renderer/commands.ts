@@ -32,6 +32,17 @@ export class AppsAPI {
   private launchParam: any = null
   private lastMatchState: LastMatchState | null = null
   private isLocalAppSearchEnabled = true
+  private cachedCommandsResult: { commands: any[]; regexCommands: any[]; plugins: any[] } | null =
+    null
+
+  /**
+   * 安全地向渲染进程发送消息
+   */
+  private notifyRenderer(channel: string, ...args: any[]): void {
+    if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+      this.mainWindow.webContents.send(channel, ...args)
+    }
+  }
 
   public init(mainWindow: Electron.BrowserWindow, pluginManager: any): void {
     this.mainWindow = mainWindow
@@ -85,12 +96,11 @@ export class AppsAPI {
    */
   public async setLocalAppSearch(enabled: boolean): Promise<void> {
     this.isLocalAppSearchEnabled = enabled
+    this.cachedCommandsResult = null
     console.log('本地应用搜索已' + (enabled ? '开启' : '关闭'))
 
     // 通知渲染进程应用列表已更新
-    if (this.mainWindow && !this.mainWindow.isDestroyed()) {
-      this.mainWindow.webContents.send('apps-changed')
-    }
+    this.notifyRenderer('apps-changed')
   }
 
   /**
@@ -191,19 +201,20 @@ export class AppsAPI {
 
         // 将 UWP 应用转换为 Command 格式，使用 uwp: 前缀标识
         for (const uwpApp of uwpApps) {
-          // 跳过重复：如果已有同名应用则不添加
+          const uwpPath = `uwp:${uwpApp.appId}`
+          // 按 name|path 组合去重，与 windowsScanner.deduplicateCommands 策略一致
+          const dedupeKey = `${uwpApp.name.toLowerCase()}|${uwpPath.toLowerCase()}`
           const isDuplicate = apps.some(
-            (a) => a.name.toLowerCase() === uwpApp.name.toLowerCase()
+            (a) => `${a.name.toLowerCase()}|${a.path.toLowerCase()}` === dedupeKey
           )
           if (isDuplicate) continue
 
           apps.push({
             name: uwpApp.name,
-            path: `uwp:${uwpApp.appId}`,
+            path: uwpPath,
             icon: uwpApp.icon || ''
           })
         }
-        console.log(apps)
         console.log(`合并 UWP 后共 ${apps.length} 个应用`)
       } catch (error) {
         console.error('获取 UWP 应用失败:', error)
@@ -228,23 +239,24 @@ export class AppsAPI {
    * 刷新应用缓存（当检测到应用文件夹变化时调用）
    */
   public async refreshAppsCache(): Promise<void> {
+    if (!this.isLocalAppSearchEnabled) {
+      console.log('本地应用搜索已关闭，跳过刷新缓存')
+      return
+    }
+
     console.log('开始刷新应用缓存...')
     try {
       await this.scanAndCacheApps()
+      this.cachedCommandsResult = null
       console.log('应用缓存刷新成功')
 
       // 通知渲染进程应用列表已更新
-      if (this.mainWindow && !this.mainWindow.isDestroyed()) {
-        this.mainWindow.webContents.send('apps-changed')
-      }
+      this.notifyRenderer('apps-changed')
     } catch (error) {
       console.error('刷新应用缓存失败:', error)
     }
   }
 
-  /**
-   * 将图标转换为 PNG 并缓存（平台自适应）
-   */
   /**
    * 启动应用或插件（统一接口）
    */
@@ -325,49 +337,46 @@ export class AppsAPI {
           await this.addToHistory({ path: appPath, type, featureCode, param, name, cmdType })
         }
 
-        // 检查是否为 system 插件（特殊处理：执行系统命令而不是创建视图）
+        // 读取 plugin.json（一次性读取，后续复用）
+        let pluginConfig: any = null
         try {
           const pluginJsonPath = path.join(appPath, 'plugin.json')
-          const pluginConfig = JSON.parse(await fs.readFile(pluginJsonPath, 'utf-8'))
-
-          if (pluginConfig.name === 'system') {
-            console.log('检测到 system 插件，执行系统命令:', featureCode)
-            // system 插件：执行系统命令
-            return await executeSystemCommand(
-              featureCode || '',
-              {
-                mainWindow: this.mainWindow,
-                pluginManager: this.pluginManager
-              },
-              param
-            )
-          }
+          pluginConfig = JSON.parse(await fs.readFile(pluginJsonPath, 'utf-8'))
         } catch (error) {
-          console.error('检查 system 插件失败:', error)
-          // 如果读取 plugin.json 失败，继续正常流程
+          console.error('读取 plugin.json 失败:', error)
+        }
+
+        // 检查是否为 system 插件（特殊处理：执行系统命令而不是创建视图）
+        if (pluginConfig?.name === 'system') {
+          console.log('检测到 system 插件，执行系统命令:', featureCode)
+          return await executeSystemCommand(
+            featureCode || '',
+            {
+              mainWindow: this.mainWindow,
+              pluginManager: this.pluginManager
+            },
+            param
+          )
         }
 
         // 普通插件：创建插件视图
-
         if (this.pluginManager) {
           // 检查是否配置为自动分离
           let shouldAutoDetach = false
-          try {
-            // 获取插件名称 (需从 path 读取 plugin.json)
-            const pluginJsonPath = path.join(appPath, 'plugin.json')
-            const pluginConfig = JSON.parse(await fs.readFile(pluginJsonPath, 'utf-8'))
-
-            const autoDetachPlugins = await databaseAPI.dbGet('autoDetachPlugin')
-            if (
-              autoDetachPlugins &&
-              Array.isArray(autoDetachPlugins) &&
-              autoDetachPlugins.includes(pluginConfig.name)
-            ) {
-              shouldAutoDetach = true
-              console.log(`插件 ${pluginConfig.name} 配置为自动分离，直接在独立窗口中创建`)
+          if (pluginConfig) {
+            try {
+              const autoDetachPlugins = await databaseAPI.dbGet('autoDetachPlugin')
+              if (
+                autoDetachPlugins &&
+                Array.isArray(autoDetachPlugins) &&
+                autoDetachPlugins.includes(pluginConfig.name)
+              ) {
+                shouldAutoDetach = true
+                console.log(`插件 ${pluginConfig.name} 配置为自动分离，直接在独立窗口中创建`)
+              }
+            } catch (error) {
+              console.error('检查自动分离配置失败:', error)
             }
-          } catch (error) {
-            console.error('检查自动分离配置失败:', error)
           }
 
           if (shouldAutoDetach) {
@@ -380,7 +389,7 @@ export class AppsAPI {
             if (!result.success) {
               console.error('在独立窗口中创建插件失败:', result.error)
               // 如果创建失败，降级到主窗口模式
-              this.mainWindow?.webContents.send('show-plugin-placeholder')
+              this.notifyRenderer('show-plugin-placeholder')
               await this.pluginManager.createPluginView(appPath, featureCode || '', name)
             } else {
               // 创建成功，隐藏主窗口
@@ -392,7 +401,7 @@ export class AppsAPI {
               this.mainWindow?.show()
             }
             // 通知渲染进程准备显示插件占位区域
-            this.mainWindow?.webContents.send('show-plugin-placeholder')
+            this.notifyRenderer('show-plugin-placeholder')
 
             // 在主窗口中创建插件
             await this.pluginManager.createPluginView(appPath, featureCode || '', name)
@@ -401,47 +410,27 @@ export class AppsAPI {
 
         return { success: true }
       } else {
-        // 直接启动（app 或 system-setting 或 local-shortcut）
-        // 检查是否是 UWP 应用（uwp: 前缀）
-        if (appPath.startsWith('uwp:')) {
-          const appId = appPath.slice(4)
-          try {
-            UwpManager.launchUwpApp(appId)
-            console.log(`成功启动 UWP 应用: ${appId}`)
-          } catch (error) {
-            console.error('启动 UWP 应用失败:', error)
-            throw error
+        // 直接启动（app / system-setting / local-shortcut / UWP / 协议链接）
+        // 检查是否为本地启动项（需要 shell.openPath 而非 launchApp）
+        const localShortcuts = await databaseAPI.dbGet('local-shortcuts')
+        const isLocalShortcut = localShortcuts?.some((s: any) => s.path === appPath)
+
+        if (isLocalShortcut) {
+          const result = await shell.openPath(appPath)
+          if (result) {
+            console.error('打开本地启动项失败:', result)
+            throw new Error(`打开失败: ${result}`)
           }
         } else {
-          // 检查是否是协议链接（如 ms-settings:, steam://, battlenet:// 等）
-          const isProtocolLink =
-            /^[a-zA-Z][a-zA-Z0-9+\-.]*:/.test(appPath) && !appPath.includes('\\')
-          if (isProtocolLink) {
-            await shell.openExternal(appPath)
-          } else {
-            // 检查是否为本地启动项
-            const localShortcuts = await databaseAPI.dbGet('local-shortcuts')
-            const isLocalShortcut = localShortcuts?.some((s: any) => s.path === appPath)
-
-            if (isLocalShortcut) {
-              // 本地启动项：使用 shell.openPath 打开
-              const result = await shell.openPath(appPath)
-              if (result) {
-                console.error('打开本地启动项失败:', result)
-                throw new Error(`打开失败: ${result}`)
-              }
-            } else {
-              // 普通应用
-              await launchApp(appPath, confirmDialog)
-            }
-          }
+          // 统一走 launchApp（内部处理 uwp: / 协议链接 / 普通应用等）
+          await launchApp(appPath, confirmDialog)
         }
 
         // 添加到历史记录
         await this.addToHistory({ path: appPath, type: 'app', name, cmdType: 'text' })
 
         // 通知渲染进程应用已启动（清空搜索框等）
-        this.mainWindow?.webContents.send('app-launched')
+        this.notifyRenderer('app-launched')
         this.mainWindow?.hide()
       }
     } catch (error) {
@@ -604,7 +593,7 @@ export class AppsAPI {
       console.log('历史记录已更新:', appInfo.name)
 
       // 通知前端重新加载历史记录
-      this.mainWindow?.webContents.send('history-changed')
+      this.notifyRenderer('history-changed')
     } catch (error) {
       console.error('添加历史记录失败:', error)
     }
@@ -743,7 +732,7 @@ export class AppsAPI {
       console.log('已从历史记录删除:', appPath, featureCode)
 
       // 通知前端重新加载历史记录
-      this.mainWindow?.webContents.send('history-changed')
+      this.notifyRenderer('history-changed')
     } catch (error) {
       console.error('从历史记录删除失败:', error)
     }
@@ -781,7 +770,7 @@ export class AppsAPI {
       console.log('已固定应用:', app.name)
 
       // 通知前端重新加载固定列表
-      this.mainWindow?.webContents.send('pinned-changed')
+      this.notifyRenderer('pinned-changed')
     } catch (error) {
       console.error('固定应用失败:', error)
     }
@@ -801,7 +790,7 @@ export class AppsAPI {
       console.log('已取消固定:', appPath, featureCode)
 
       // 通知前端重新加载固定列表
-      this.mainWindow?.webContents.send('pinned-changed')
+      this.notifyRenderer('pinned-changed')
     } catch (error) {
       console.error('取消固定失败:', error)
     }
@@ -828,7 +817,7 @@ export class AppsAPI {
       console.log('固定列表顺序已更新')
 
       // 通知前端重新加载固定列表
-      this.mainWindow?.webContents.send('pinned-changed')
+      this.notifyRenderer('pinned-changed')
     } catch (error) {
       console.error('更新固定列表顺序失败:', error)
     }
@@ -879,9 +868,19 @@ export class AppsAPI {
 
   /**
    * 获取所有指令（供 AllCommands 页面使用）
-   * 返回处理后的 commands 和 regexCommands
+   * 返回处理后的 commands、regexCommands 和 plugins
+   * 结果会被缓存，直到应用列表或插件发生变化时清除
    */
-  private async getCommands(): Promise<{ commands: any[]; regexCommands: any[] }> {
+  private async getCommands(): Promise<{
+    commands: any[]
+    regexCommands: any[]
+    plugins: any[]
+  }> {
+    // 命中缓存直接返回
+    if (this.cachedCommandsResult) {
+      return this.cachedCommandsResult
+    }
+
     try {
       const rawApps = await this.getApps()
 
@@ -961,10 +960,12 @@ export class AppsAPI {
         }
       }
 
-      return { commands, regexCommands }
+      const result = { commands, regexCommands, plugins }
+      this.cachedCommandsResult = result
+      return result
     } catch (error) {
       console.error('获取指令列表失败:', error)
-      return { commands: [], regexCommands: [] }
+      return { commands: [], regexCommands: [], plugins: [] }
     }
   }
 }

@@ -1,5 +1,6 @@
 import { spawn } from 'child_process'
 import { dialog, shell } from 'electron'
+import { UwpManager } from '../native'
 import type { ConfirmDialogOptions } from './types'
 
 /**
@@ -51,6 +52,19 @@ export async function launchApp(
     if (result.response === confirmDialog.cancelId) {
       console.log('用户取消了操作')
       return
+    }
+  }
+
+  // 检查是否是 UWP 应用（uwp: 前缀）
+  if (appPath.startsWith('uwp:')) {
+    const appId = appPath.slice(4)
+    try {
+      UwpManager.launchUwpApp(appId)
+      console.log(`成功启动 UWP 应用: ${appId}`)
+      return
+    } catch (error) {
+      console.error('启动 UWP 应用失败:', error)
+      throw error
     }
   }
 

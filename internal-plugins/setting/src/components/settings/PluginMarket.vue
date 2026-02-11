@@ -126,9 +126,9 @@
 
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue'
+import { useToast } from '../../composables/useToast'
 import AdaptiveIcon from '../common/AdaptiveIcon.vue'
 import PluginDetail from './PluginDetail.vue'
-import { useToast } from '../../composables/useToast'
 
 const { success, error, confirm } = useToast()
 
@@ -532,18 +532,23 @@ onUnmounted(() => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 40px;
-  color: var(--text-secondary);
+  width: 100%;
+  height: 100%;
+  gap: 12px;
 }
 
 .loading-spinner {
-  width: 30px;
-  height: 30px;
-  border: 3px solid var(--border-color);
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--divider-color);
   border-top-color: var(--primary-color);
   border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin-bottom: 12px;
+  animation: spin 0.8s linear infinite;
+}
+
+.loading-state span {
+  font-size: 13px;
+  color: var(--text-color-secondary);
 }
 
 @keyframes spin {
