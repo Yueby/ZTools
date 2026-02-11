@@ -1,3 +1,4 @@
+import { app } from 'electron'
 import os from 'os'
 import path from 'path'
 
@@ -26,8 +27,8 @@ export function getWindowsScanPaths(): string[] {
     'Programs'
   )
 
-  // 用户桌面
-  const userDesktop = path.join(os.homedir(), 'Desktop')
+  // 用户桌面（使用 Electron API 获取真实路径，支持桌面被移到其他位置的情况）
+  const userDesktop = app.getPath('desktop')
 
   // 公共桌面
   const publicDesktop = path.join('C:', 'Users', 'Public', 'Desktop')
