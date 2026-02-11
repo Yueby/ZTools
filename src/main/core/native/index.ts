@@ -38,6 +38,7 @@ interface NativeAddon {
   getUwpApps: () => UwpAppInfo[]
   launchUwpApp: (appId: string) => boolean
   getFileIcon: (filePath: string, size: number) => Buffer | null
+  resolveMuiStrings: (refs: string[]) => { [ref: string]: string }
 }
 
 interface WindowInfo {
@@ -457,6 +458,27 @@ export class IconExtractor {
       throw new TypeError(`size must be one of: ${validSizes.join(', ')}`)
     }
     return (addon as NativeAddon).getFileIcon(filePath, size)
+  }
+}
+
+/**
+ * MUI 资源字符串解析类
+ */
+export class MuiResolver {
+  /**
+   * 批量解析 MUI 资源字符串
+   * @param refs - MUI 引用字符串数组，如 ['@%SystemRoot%\\system32\\shell32.dll,-22067']
+   * @returns 解析结果 Map，key 为原始引用，value 为解析后的本地化字符串
+   */
+  static resolve(refs: string[]): Map<string, string> {
+    if (platform !== 'win32') {
+      throw new Error('MuiResolver is only supported on Windows')
+    }
+    if (!Array.isArray(refs)) {
+      throw new TypeError('refs must be an array of strings')
+    }
+    const result = (addon as NativeAddon).resolveMuiStrings(refs)
+    return new Map(Object.entries(result))
   }
 }
 

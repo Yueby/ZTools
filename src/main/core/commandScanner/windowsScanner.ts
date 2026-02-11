@@ -1,13 +1,10 @@
-import { execFile } from 'child_process'
 import { shell } from 'electron'
 import fsPromises from 'fs/promises'
 import path from 'path'
-import { promisify } from 'util'
 import { extractAcronym } from '../../utils/common'
 import { getWindowsScanPaths } from '../../utils/systemPaths'
+import { MuiResolver } from '../native/index'
 import { Command } from './types'
-
-const execFileAsync = promisify(execFile)
 
 // ========== 配置 ==========
 
@@ -84,73 +81,11 @@ async function parseDesktopIni(dirPath: string): Promise<Map<string, string>> {
 
 /**
  * 批量解析 MUI 资源字符串（如 @%SystemRoot%\system32\shell32.dll,-22067）。
- * 通过 PowerShell P/Invoke 调用 Win32 LoadLibraryEx + LoadString。
- *
- * 注意：SHLoadIndirectString 在子进程中 MUI 重定向会失效（始终返回英文），
- * 所以必须手动查找 CurrentUICulture 对应的 .mui 文件再用 LoadString 加载。
+ * 通过原生模块调用 Win32 API 实现。
  */
-async function resolveMuiStrings(muiRefs: string[]): Promise<Map<string, string>> {
-  const resolved = new Map<string, string>()
-  if (muiRefs.length === 0) return resolved
-
-  // 将 MUI 引用作为 JSON 数组传入 PowerShell
-  const refsJson = JSON.stringify(muiRefs).replace(/'/g, "''")
-
-  const script = [
-    'Add-Type @"',
-    'using System; using System.Runtime.InteropServices; using System.Text;',
-    'using System.IO; using System.Globalization;',
-    'public class MuiResolver {',
-    '  [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)]',
-    '  static extern IntPtr LoadLibraryEx(string f, IntPtr h, uint d);',
-    '  [DllImport("user32.dll", CharSet=CharSet.Unicode)]',
-    '  static extern int LoadString(IntPtr h, uint id, StringBuilder sb, int n);',
-    '  [DllImport("kernel32.dll")] static extern bool FreeLibrary(IntPtr h);',
-    '  static string LoadFromDll(string p, uint id) {',
-    '    IntPtr h = LoadLibraryEx(p, IntPtr.Zero, 2); if (h==IntPtr.Zero) return null;',
-    '    var sb = new StringBuilder(1024); int len = LoadString(h,id,sb,sb.Capacity);',
-    '    FreeLibrary(h); return len>0 ? sb.ToString() : null; }',
-    '  public static string Resolve(string s) {',
-    '    if (string.IsNullOrEmpty(s)||!s.StartsWith("@")) return s;',
-    '    string r=s.Substring(1); int ci=r.LastIndexOf(","); if(ci<0) return null;',
-    '    string dll=Environment.ExpandEnvironmentVariables(r.Substring(0,ci));',
-    '    string ids=r.Substring(ci+1); uint id;',
-    '    if(ids.StartsWith("-")){if(!uint.TryParse(ids.Substring(1),out id))return null;}',
-    '    else{if(!uint.TryParse(ids,out id))return null;}',
-    '    string dir=Path.GetDirectoryName(dll), fn=Path.GetFileName(dll);',
-    '    string lang=CultureInfo.CurrentUICulture.Name;',
-    '    string mui=Path.Combine(dir,lang,fn+".mui");',
-    '    if(File.Exists(mui)){string v=LoadFromDll(mui,id);if(v!=null)return v;}',
-    '    var par=CultureInfo.CurrentUICulture.Parent;',
-    '    if(par!=null&&!string.IsNullOrEmpty(par.Name)){',
-    '      mui=Path.Combine(dir,par.Name,fn+".mui");',
-    '      if(File.Exists(mui)){string v=LoadFromDll(mui,id);if(v!=null)return v;}}',
-    '    return LoadFromDll(dll,id); } }',
-    '"@',
-    '[Console]::OutputEncoding=[System.Text.Encoding]::UTF8',
-    `$refs='${refsJson}'|ConvertFrom-Json`,
-    'foreach($r in $refs){$n=[MuiResolver]::Resolve($r)',
-    '  if($n){[Console]::Out.WriteLine("$r`t$n")}}'
-  ].join('\n')
-
-  const { stdout } = await execFileAsync(
-    'powershell.exe',
-    ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', script],
-    { encoding: 'utf8', timeout: 15000 }
-  )
-
-  for (const line of stdout.split('\n')) {
-    const trimmed = line.trim()
-    if (!trimmed) continue
-    const tabIdx = trimmed.indexOf('\t')
-    if (tabIdx > 0) {
-      const ref = trimmed.slice(0, tabIdx)
-      const name = trimmed.slice(tabIdx + 1)
-      if (ref && name) resolved.set(ref, name)
-    }
-  }
-
-  return resolved
+function resolveMuiStrings(muiRefs: string[]): Map<string, string> {
+  if (muiRefs.length === 0) return new Map()
+  return MuiResolver.resolve(muiRefs)
 }
 
 /**
@@ -160,7 +95,7 @@ async function resolveMuiStrings(muiRefs: string[]): Promise<Map<string, string>
  *
  * 分两步：
  * 1. Node.js 直接读取 desktop.ini（纯文件 I/O + 解析）
- * 2. 遇到 MUI 引用（@dll,-id）时，批量交给 PowerShell 解析（Win32 API，不可避免）
+ * 2. 遇到 MUI 引用（@dll,-id）时，批量交给原生模块解析（Win32 API）
  */
 async function getLocalizedDisplayNames(dirPaths: string[]): Promise<Map<string, string>> {
   const nameMap = new Map<string, string>()
@@ -204,10 +139,10 @@ async function getLocalizedDisplayNames(dirPaths: string[]): Promise<Map<string,
       await scanDir(dirPath)
     }
 
-    // 第 2 步：批量解析 MUI 引用（需要 Win32 API，通过 PowerShell P/Invoke）
+    // 第 2 步：批量解析 MUI 引用（通过原生模块调用 Win32 API）
     if (pendingMui.size > 0) {
       const muiRefs = Array.from(pendingMui.keys())
-      const resolved = await resolveMuiStrings(muiRefs)
+      const resolved = resolveMuiStrings(muiRefs)
 
       for (const [ref, localizedName] of resolved) {
         const filePaths = pendingMui.get(ref) || []
