@@ -609,9 +609,6 @@ onUnmounted(() => {
   min-height: 0;
 }
 
-.pinned-grid::-webkit-scrollbar {
-  display: none;
-}
 
 .grid-item {
   display: flex;
@@ -707,9 +704,6 @@ onUnmounted(() => {
   flex: 1;
 }
 
-.search-list::-webkit-scrollbar {
-  display: none;
-}
 
 .list-item {
   display: flex;

@@ -26,7 +26,7 @@ export const SKIP_FOLDERS = [
 // 仅按名称过滤，不按目标类型/路径/扩展名过滤
 // 因为扫描范围仅限开始菜单和桌面，这些位置的快捷方式都是有意放置的
 export const SKIP_NAME_PATTERN =
-  /^uninstall |^卸载|卸载$|website|网站|帮助|help|readme|read me|文档|manual|license|documentation/i
+  /^uninstall|^卸载|卸载$|website|网站|帮助|help|readme|read me|文档|manual|license|documentation/i
 
 // ========== 辅助函数 ==========
 

@@ -1,4 +1,5 @@
-import { BrowserWindow, shell, clipboard } from 'electron'
+import { BrowserWindow, clipboard, shell } from 'electron'
+import { GLOBAL_SCROLLBAR_CSS } from '../../core/globalStyles'
 import windowManager from '../../managers/windowManager'
 
 interface SystemCommandContext {
@@ -242,6 +243,10 @@ function handleWindowInfo(ctx: SystemCommandContext): any {
   })
 
   infoWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
+
+  infoWindow.webContents.on('did-finish-load', () => {
+    infoWindow.webContents.insertCSS(GLOBAL_SCROLLBAR_CSS)
+  })
 
   infoWindow.on('blur', () => {
     if (!infoWindow.isDestroyed()) {
