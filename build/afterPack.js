@@ -1,5 +1,36 @@
-const fs = require('fs-extra')
+const fs = require('fs/promises')
 const path = require('path')
+
+async function pathExists(p) {
+  try {
+    await fs.access(p)
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function remove(p) {
+  await fs.rm(p, { recursive: true, force: true })
+}
+
+async function ensureDir(p) {
+  await fs.mkdir(p, { recursive: true })
+}
+
+async function copy(src, dest) {
+  const stat = await fs.stat(src)
+  if (stat.isDirectory()) {
+    await ensureDir(dest)
+    const entries = await fs.readdir(src)
+    for (const entry of entries) {
+      await copy(path.join(src, entry), path.join(dest, entry))
+    }
+  } else {
+    await ensureDir(path.dirname(dest))
+    await fs.copyFile(src, dest)
+  }
+}
 
 module.exports = async function (context) {
   console.log('开始清理国际化文件...')
@@ -33,7 +64,7 @@ module.exports = async function (context) {
 
     for (const resourcesPath of resourcesPaths) {
       try {
-        if (await fs.pathExists(resourcesPath)) {
+        if (await pathExists(resourcesPath)) {
           console.log(`\n清理目录: ${resourcesPath}`)
           const files = await fs.readdir(resourcesPath)
           let deletedCount = 0
@@ -50,7 +81,7 @@ module.exports = async function (context) {
                 // 忽略
               }
 
-              await fs.remove(filePath)
+              await remove(filePath)
               console.log(`  已删除: ${file}`)
               deletedCount++
               totalDeleted++
@@ -78,14 +109,14 @@ module.exports = async function (context) {
     const keepLocalesPak = ['en-US.pak', 'zh-CN.pak']
 
     try {
-      if (await fs.pathExists(localesPath)) {
+      if (await pathExists(localesPath)) {
         const files = await fs.readdir(localesPath)
         let deletedCount = 0
 
         for (const file of files) {
           if (file.endsWith('.pak') && !keepLocalesPak.includes(file)) {
             const filePath = path.join(localesPath, file)
-            await fs.remove(filePath)
+            await remove(filePath)
             console.log(`已删除: ${file}`)
             deletedCount++
           }
@@ -104,14 +135,14 @@ module.exports = async function (context) {
     const keepLocalesPak = ['en-US.pak', 'zh-CN.pak']
 
     try {
-      if (await fs.pathExists(localesPath)) {
+      if (await pathExists(localesPath)) {
         const files = await fs.readdir(localesPath)
         let deletedCount = 0
 
         for (const file of files) {
           if (file.endsWith('.pak') && !keepLocalesPak.includes(file)) {
             const filePath = path.join(localesPath, file)
-            await fs.remove(filePath)
+            await remove(filePath)
             console.log(`已删除: ${file}`)
             deletedCount++
           }
@@ -130,15 +161,6 @@ module.exports = async function (context) {
 
   try {
     if (context.electronPlatformName === 'darwin') {
-      const arch = context.arch === 1 ? 'arm64' : 'amd64' // 1 is arm64 in electron-builder context usually, but let's double check or use safe path
-      // electron-builder context.arch is a number (0=ia32, 1=x64, 3=arm64) usually from electron-builder internals,
-      // but easier to rely on string if available or check standard mapping.
-      // Actually standard electron-builder `context.arch` is distinct.
-      // Let's rely on standard folder names matching current build.
-      // Simply check which folder exists or use context.archName which is string 'x64' or 'arm64'
-
-      const archName = context.arch === 3 ? 'arm64' : 'amd64' // 3 is arm64, 1 is x64.
-      // Safe fallback:
       const safeArch = context.arch === 3 || context.arch === 'arm64' ? 'arm64' : 'amd64'
 
       const appName = context.packager.appInfo.productFilename
@@ -146,23 +168,19 @@ module.exports = async function (context) {
       const dest = path.join(appPath, 'Contents', 'MacOS', 'ztools-updater')
       const src = path.join(updaterDir, `mac-${safeArch}`, 'ztools-updater')
 
-      if (await fs.pathExists(src)) {
-        await fs.copy(src, dest)
+      if (await pathExists(src)) {
+        await copy(src, dest)
         await fs.chmod(dest, 0o755)
         console.log(`已复制 updater 到: ${dest}`)
       } else {
         console.error(`未找到 updater 文件: ${src}`)
       }
     } else if (context.electronPlatformName === 'win32') {
-      const safeArch = context.arch === 1 || context.arch === 'x64' ? 'amd64' : '386' // Adjust as needed
-      // Actually my previous ls command showed `win-amd64`.
-      // Let's assume 64bit build for now or check.
-      // Usually user builds for x64.
       const src = path.join(updaterDir, 'win-amd64', 'ztools-agent.exe')
       const dest = path.join(context.appOutDir, 'ztools-agent.exe')
 
-      if (await fs.pathExists(src)) {
-        await fs.copy(src, dest)
+      if (await pathExists(src)) {
+        await copy(src, dest)
         console.log(`已复制 agent 到: ${dest}`)
       } else {
         console.error(`未找到 agent 文件: ${src}`)
@@ -195,27 +213,27 @@ module.exports = async function (context) {
       const pluginDestDir = path.join(destInternalPluginsDir, pluginName)
 
       // 确保目标目录存在
-      await fs.ensureDir(pluginDestDir)
+      await ensureDir(pluginDestDir)
 
       // 优先复制 dist 目录（需要编译的插件，如 setting）
       const distSrc = path.join(pluginSrcDir, 'dist')
-      if (await fs.pathExists(distSrc)) {
+      if (await pathExists(distSrc)) {
         const files = await fs.readdir(distSrc)
         for (const file of files) {
           const src = path.join(distSrc, file)
           const dest = path.join(pluginDestDir, file)
-          await fs.copy(src, dest)
+          await copy(src, dest)
         }
         console.log(`  已复制 dist/ 目录内容到: ${pluginDestDir}`)
       } else {
         // 如果没有 dist 目录，复制 public 目录（无界面插件，如 system）
         const publicSrc = path.join(pluginSrcDir, 'public')
-        if (await fs.pathExists(publicSrc)) {
+        if (await pathExists(publicSrc)) {
           const files = await fs.readdir(publicSrc)
           for (const file of files) {
             const src = path.join(publicSrc, file)
             const dest = path.join(pluginDestDir, file)
-            await fs.copy(src, dest)
+            await copy(src, dest)
           }
           console.log(`  已复制 public/ 目录内容到: ${pluginDestDir}`)
         } else {
@@ -264,7 +282,7 @@ module.exports = async function (context) {
       )
     }
 
-    if (lmdbPath && (await fs.pathExists(lmdbPath))) {
+    if (lmdbPath && (await pathExists(lmdbPath))) {
       let deletedSize = 0
       const isArm64 = context.arch === 3 || context.arch === 'arm64'
       const isX64 = context.arch === 1 || context.arch === 'x64'
@@ -274,9 +292,9 @@ module.exports = async function (context) {
         // ARM64 构建时删除 x64 模块
         if (isArm64) {
           const x64ModulePath = path.join(lmdbPath, 'lmdb-darwin-x64')
-          if (await fs.pathExists(x64ModulePath)) {
+          if (await pathExists(x64ModulePath)) {
             const size = await getFolderSize(x64ModulePath)
-            await fs.remove(x64ModulePath)
+            await remove(x64ModulePath)
             deletedSize += size
             console.log(
               `  已删除 x64 模块: lmdb-darwin-x64 (${(size / 1024 / 1024).toFixed(2)} MB)`
@@ -287,9 +305,9 @@ module.exports = async function (context) {
         // x64 构建时删除 ARM64 模块
         if (isX64) {
           const arm64ModulePath = path.join(lmdbPath, 'lmdb-darwin-arm64')
-          if (await fs.pathExists(arm64ModulePath)) {
+          if (await pathExists(arm64ModulePath)) {
             const size = await getFolderSize(arm64ModulePath)
-            await fs.remove(arm64ModulePath)
+            await remove(arm64ModulePath)
             deletedSize += size
             console.log(
               `  已删除 arm64 模块: lmdb-darwin-arm64 (${(size / 1024 / 1024).toFixed(2)} MB)`
@@ -303,9 +321,9 @@ module.exports = async function (context) {
         const darwinModules = ['lmdb-darwin-x64', 'lmdb-darwin-arm64']
         for (const moduleName of darwinModules) {
           const modulePath = path.join(lmdbPath, moduleName)
-          if (await fs.pathExists(modulePath)) {
+          if (await pathExists(modulePath)) {
             const size = await getFolderSize(modulePath)
-            await fs.remove(modulePath)
+            await remove(modulePath)
             deletedSize += size
             console.log(
               `  已删除 macOS 模块: ${moduleName} (${(size / 1024 / 1024).toFixed(2)} MB)`
@@ -345,18 +363,12 @@ module.exports = async function (context) {
       unpackedPath = path.join(context.appOutDir, 'resources', 'app.asar.unpacked')
     }
 
-    if (await fs.pathExists(asarPath)) {
+    if (await pathExists(asarPath)) {
       // 输出路径
-      // context.outDir 是 dist 目录 (electron-builder 默认)
-      // 使用 version 命名
       const version = context.packager.appInfo.version
-      // 使用 platform-arch 区分
       const archName = context.arch === 3 || context.arch === 'arm64' ? 'arm64' : 'x64'
       const platform = context.electronPlatformName
 
-      // 确保输出目录存在 (context.outDir 似乎不可靠，appOutDir 的上级通常是 arch 目录，再上级是 dist)
-      // 通常 context.packager.projectDir 是项目根目录
-      // 我们放到项目根目录的 dist_updates 下吧，或者直接放到 outDir 下
       const outDir = path.dirname(context.appOutDir)
       const zipName = `update-${platform}-${archName}-${version}.zip`
       const zipPath = path.join(outDir, zipName)
@@ -368,7 +380,7 @@ module.exports = async function (context) {
       zip.addLocalFile(asarPath, '', 'app.asar.tmp')
       console.log(`已添加 app.asar (重命名为 app.asar.tmp)`)
 
-      if (await fs.pathExists(unpackedPath)) {
+      if (await pathExists(unpackedPath)) {
         zip.addLocalFolder(unpackedPath, 'app.asar.unpacked')
         console.log(`已添加 app.asar.unpacked`)
       }
