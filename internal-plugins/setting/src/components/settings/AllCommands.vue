@@ -928,6 +928,7 @@ onMounted(async () => {
   flex: 1;
   overflow-y: auto;
   padding: 16px 20px;
+  position: relative;
 }
 
 .command-list {
@@ -1210,12 +1211,15 @@ onMounted(async () => {
 
 /* === 空状态 === */
 .empty-state {
+  position: absolute;
+  inset: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 60px 20px;
+  padding: 20px;
   text-align: center;
+  pointer-events: none;
   color: var(--text-secondary);
 }
 

@@ -502,7 +502,7 @@ export const useCommandDataStore = defineStore('commandData', () => {
       try {
         const shortcuts = await window.ztools.localShortcuts.getAll()
         localShortcuts = shortcuts.map((s: any) => ({
-          name: s.name,
+          name: s.alias || s.name,
           path: s.path,
           icon: s.icon,
           type: 'direct' as const,

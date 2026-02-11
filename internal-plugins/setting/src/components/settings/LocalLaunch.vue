@@ -1,7 +1,13 @@
 <template>
   <div class="content-panel">
+    <!-- 加载状态 -->
+    <div v-if="loading" class="loading-overlay">
+      <div class="loading-spinner"></div>
+      <span class="loading-text">加载中...</span>
+    </div>
+
     <!-- 拖拽蒙层 -->
-    <div v-if="isDragging" class="drag-overlay">
+    <div v-if="!loading && isDragging" class="drag-overlay">
       <div class="drag-overlay-content">
         <svg
           class="drag-icon"
@@ -24,6 +30,7 @@
     </div>
 
     <div
+      v-show="!loading"
       class="scrollable-content"
       @dragover.prevent="handleDragOver"
       @dragleave="handleDragLeave"
@@ -100,14 +107,50 @@
           </div>
 
           <div class="shortcut-info">
-            <div class="shortcut-name">
-              {{ shortcut.name }}
-              <span class="type-badge">{{ getTypeLabel(shortcut.type) }}</span>
+            <!-- 编辑别名模式 -->
+            <div v-if="editingId === shortcut.id" class="alias-edit-row">
+              <input
+                ref="aliasInputRef"
+                v-model="editingAlias"
+                type="text"
+                class="input alias-input"
+                placeholder="输入别名，留空则使用原名"
+                @keyup.enter="saveAlias(shortcut)"
+                @keyup.escape="cancelEdit"
+                @blur="saveAlias(shortcut)"
+              />
             </div>
+            <!-- 正常显示模式 -->
+            <template v-else>
+              <div class="shortcut-name">
+                {{ shortcut.alias || shortcut.name }}
+                <span class="type-badge">{{ getTypeLabel(shortcut.type) }}</span>
+              </div>
+            </template>
             <div class="shortcut-path" :title="shortcut.path">{{ shortcut.path }}</div>
           </div>
 
           <div class="shortcut-actions">
+            <button
+              class="icon-btn alias-btn"
+              :title="shortcut.alias ? '修改别名' : '设置别名'"
+              @click.stop="startEdit(shortcut)"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+              </svg>
+            </button>
             <button class="icon-btn open-btn" title="打开" @click.stop="handleOpen(shortcut)">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -156,7 +199,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { nextTick, onMounted, ref } from 'vue'
 import AdaptiveIcon from '../common/AdaptiveIcon.vue'
 import { useToast } from '../../composables/useToast'
 
@@ -165,6 +208,7 @@ const { success, error, confirm } = useToast()
 interface LocalShortcut {
   id: string
   name: string
+  alias?: string
   path: string
   type: 'file' | 'folder' | 'app'
   icon?: string
@@ -174,9 +218,14 @@ interface LocalShortcut {
 }
 
 const shortcuts = ref<LocalShortcut[]>([])
+const loading = ref(true)
 const isAdding = ref(false)
 const isDeleting = ref(false)
 const isDragging = ref(false)
+
+// 别名编辑状态
+const editingId = ref<string | null>(null)
+const editingAlias = ref('')
 
 // 加载本地启动项列表
 async function loadShortcuts(): Promise<void> {
@@ -264,6 +313,55 @@ async function handleDrop(e: DragEvent): Promise<void> {
   }
 }
 
+// 开始编辑别名
+function startEdit(shortcut: LocalShortcut): void {
+  editingId.value = shortcut.id
+  editingAlias.value = shortcut.alias || ''
+  // 下一帧聚焦输入框
+  nextTick(() => {
+    const inputs = document.querySelectorAll('.alias-input')
+    const input = inputs[inputs.length - 1] as HTMLInputElement | null
+    input?.focus()
+    input?.select()
+  })
+}
+
+// 取消编辑
+function cancelEdit(): void {
+  editingId.value = null
+  editingAlias.value = ''
+}
+
+// 保存别名
+async function saveAlias(shortcut: LocalShortcut): Promise<void> {
+  if (editingId.value !== shortcut.id) return
+
+  const newAlias = editingAlias.value.trim()
+  const oldAlias = shortcut.alias || ''
+
+  // 如果没有变化，直接取消编辑
+  if (newAlias === oldAlias) {
+    cancelEdit()
+    return
+  }
+
+  try {
+    const result = await window.ztools.internal.localShortcuts.updateAlias(shortcut.id, newAlias)
+    if (result.success) {
+      // 更新本地状态
+      shortcut.alias = newAlias || undefined
+      success(newAlias ? '别名已更新' : '别名已清除')
+    } else {
+      error(result.error || '更新别名失败')
+    }
+  } catch (err) {
+    console.error('更新别名失败:', err)
+    error('更新别名失败')
+  } finally {
+    cancelEdit()
+  }
+}
+
 // 打开项目
 async function handleOpen(shortcut: LocalShortcut): Promise<void> {
   try {
@@ -322,12 +420,48 @@ function getTypeLabel(type: string): string {
 }
 
 // 组件挂载时加载数据
-onMounted(() => {
-  loadShortcuts()
+onMounted(async () => {
+  loading.value = true
+  try {
+    await loadShortcuts()
+  } finally {
+    loading.value = false
+  }
 })
 </script>
 
 <style scoped>
+/* === 加载状态 === */
+.loading-overlay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  gap: 12px;
+}
+
+.loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--divider-color);
+  border-top-color: var(--primary-color);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.loading-text {
+  font-size: 13px;
+  color: var(--text-color-secondary);
+}
+
 .content-panel {
   position: relative; /* 重要：为 absolute 定位的子元素提供定位上下文 */
   height: 100%;
@@ -550,6 +684,15 @@ onMounted(() => {
   cursor: not-allowed;
 }
 
+.alias-btn {
+  color: var(--text-secondary);
+}
+
+.alias-btn:hover {
+  color: var(--primary-color);
+  background: var(--primary-light-bg);
+}
+
 .open-btn:hover {
   color: var(--primary-color);
   background: var(--primary-light-bg);
@@ -558,5 +701,20 @@ onMounted(() => {
 .delete-btn:hover {
   color: var(--danger-color);
   background: var(--danger-light-bg);
+}
+
+/* 别名编辑 */
+.alias-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.alias-input {
+  min-width: 0;
+  flex: 1;
+  padding: 4px 10px;
+  font-size: 14px;
 }
 </style>

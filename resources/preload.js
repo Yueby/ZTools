@@ -226,7 +226,7 @@ window.ztools = {
 
     // 创建 Proxy 对象模拟 BrowserWindow
     const createProxy = (path = []) => {
-      return new Proxy(() => { }, {
+      return new Proxy(() => {}, {
         get: (target, prop) => {
           if (typeof prop !== 'string') return undefined
 
@@ -355,7 +355,8 @@ window.ztools = {
       electron.ipcRenderer.on(`plugin:ai-stream-${requestId}`, streamListener)
 
       // 创建 Promise
-      const promise = electron.ipcRenderer.invoke('plugin:ai-call-stream', requestId, option)
+      const promise = electron.ipcRenderer
+        .invoke('plugin:ai-call-stream', requestId, option)
         .then((result) => {
           // 移除监听器
           electron.ipcRenderer.removeListener(`plugin:ai-stream-${requestId}`, streamListener)
@@ -378,7 +379,8 @@ window.ztools = {
       return promiseLike
     } else {
       // 非流式调用
-      const promise = electron.ipcRenderer.invoke('plugin:ai-call', requestId, option)
+      const promise = electron.ipcRenderer
+        .invoke('plugin:ai-call', requestId, option)
         .then((result) => {
           if (!result.success) {
             throw new Error(result.error || 'AI 调用失败')
@@ -424,7 +426,9 @@ window.ztools = {
       addByPath: async (filePath) =>
         await electron.ipcRenderer.invoke('local-shortcuts:add-by-path', filePath),
       delete: async (id) => await electron.ipcRenderer.invoke('local-shortcuts:delete', id),
-      open: async (path) => await electron.ipcRenderer.invoke('local-shortcuts:open', path)
+      open: async (path) => await electron.ipcRenderer.invoke('local-shortcuts:open', path),
+      updateAlias: async (id, alias) =>
+        await electron.ipcRenderer.invoke('local-shortcuts:update-alias', id, alias)
     },
 
     // ==================== 插件管理 API ====================
@@ -582,8 +586,10 @@ window.ztools = {
     aiModels: {
       getAll: async () => await electron.ipcRenderer.invoke('internal:ai-models-get-all'),
       add: async (model) => await electron.ipcRenderer.invoke('internal:ai-models-add', model),
-      update: async (model) => await electron.ipcRenderer.invoke('internal:ai-models-update', model),
-      delete: async (modelId) => await electron.ipcRenderer.invoke('internal:ai-models-delete', modelId)
+      update: async (model) =>
+        await electron.ipcRenderer.invoke('internal:ai-models-update', model),
+      delete: async (modelId) =>
+        await electron.ipcRenderer.invoke('internal:ai-models-delete', modelId)
     }
   }
 }

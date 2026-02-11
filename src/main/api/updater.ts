@@ -501,7 +501,7 @@ export class UpdaterAPI {
     const { workArea } = primaryDisplay
     const x = Math.round(workArea.x + (workArea.width - width) / 2)
     const y = Math.round(workArea.y + (workArea.height - height) / 2)
-    
+
     const windowConfig: Electron.BrowserWindowConstructorOptions = {
       width,
       height,
@@ -553,7 +553,6 @@ export class UpdaterAPI {
       this.updateWindow = null
     })
   }
-
 
   /**
    * 关闭更新窗口

@@ -300,7 +300,8 @@ async function scanDirectory(
         if (!urlInfo) continue
 
         // 优先使用本地化显示名称，降级为磁盘文件名
-        const appName = displayNameMap.get(fullPath.toLowerCase()) || path.basename(entry.name, '.url')
+        const appName =
+          displayNameMap.get(fullPath.toLowerCase()) || path.basename(entry.name, '.url')
 
         // 过滤检查
         if (SKIP_NAME_PATTERN.test(appName)) continue
@@ -323,7 +324,8 @@ async function scanDirectory(
 
       // 优先使用本地化显示名称，降级为磁盘文件名
       // 解决 Windows 系统快捷方式文件名为英文（如 File Explorer.lnk）但显示名为中文的问题
-      const appName = displayNameMap.get(fullPath.toLowerCase()) || path.basename(entry.name, '.lnk')
+      const appName =
+        displayNameMap.get(fullPath.toLowerCase()) || path.basename(entry.name, '.lnk')
 
       // 尝试解析快捷方式目标（必须先解析才能获取真实路径）
       let shortcutDetails: Electron.ShortcutDetails | null = null

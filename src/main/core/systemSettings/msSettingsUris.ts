@@ -460,5 +460,5 @@ export const MS_SETTINGS_URIS: Omit<SystemSetting, 'icon'>[] = [
     name: '搜索权限',
     uri: 'ms-settings:search-permissions',
     category: '搜索'
-  },
+  }
 ]

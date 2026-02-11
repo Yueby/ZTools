@@ -428,12 +428,15 @@ onMounted(() => {
 
 /* 空状态 */
 .empty-state {
+  position: absolute;
+  inset: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 60px 20px;
+  padding: 20px;
   text-align: center;
+  pointer-events: none;
 }
 
 .empty-icon {

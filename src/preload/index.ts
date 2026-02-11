@@ -270,7 +270,9 @@ const api = {
     getAll: () => ipcRenderer.invoke('local-shortcuts:get-all'),
     add: (type: 'file' | 'folder') => ipcRenderer.invoke('local-shortcuts:add', type),
     delete: (id: string) => ipcRenderer.invoke('local-shortcuts:delete', id),
-    open: (path: string) => ipcRenderer.invoke('local-shortcuts:open', path)
+    open: (path: string) => ipcRenderer.invoke('local-shortcuts:open', path),
+    updateAlias: (id: string, alias: string) =>
+      ipcRenderer.invoke('local-shortcuts:update-alias', id, alias)
   },
   // 文件系统检查（异步，通过主进程）
   checkFilePaths: (paths: string[]) => ipcRenderer.invoke('check-file-paths', paths),

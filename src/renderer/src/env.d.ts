@@ -285,6 +285,7 @@ declare global {
           Array<{
             id: string
             name: string
+            alias?: string
             path: string
             type: 'file' | 'folder' | 'app'
             icon?: string
@@ -297,6 +298,7 @@ declare global {
         add: (type: 'file' | 'folder') => Promise<{ success: boolean; error?: string }>
         delete: (id: string) => Promise<{ success: boolean; error?: string }>
         open: (path: string) => Promise<{ success: boolean; error?: string }>
+        updateAlias: (id: string, alias: string) => Promise<{ success: boolean; error?: string }>
       }
       // 文件系统检查（异步，通过主进程）
       checkFilePaths: (

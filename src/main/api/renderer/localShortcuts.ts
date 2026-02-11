@@ -12,12 +12,13 @@ import databaseAPI from '../shared/database'
 export interface LocalShortcut {
   id: string // 唯一标识
   name: string // 显示名称（文件名）
+  alias?: string // 别名（用户自定义，优先用于搜索和显示）
   path: string // 完整路径
   type: 'file' | 'folder' | 'app' // 类型
   icon?: string // 图标路径（可选）
   keywords?: string[] // 搜索关键词
-  pinyin?: string // 拼音
-  pinyinAbbr?: string // 拼音首字母
+  pinyin?: string // 拼音（基于 alias || name）
+  pinyinAbbr?: string // 拼音首字母（基于 alias || name）
   addedAt: number // 添加时间戳
 }
 
@@ -90,6 +91,9 @@ export class LocalShortcutsAPI {
     ipcMain.handle('local-shortcuts:delete', (_event, id: string) => this.deleteShortcut(id))
     ipcMain.handle('local-shortcuts:open', (_event, shortcutPath: string) =>
       this.openShortcut(shortcutPath)
+    )
+    ipcMain.handle('local-shortcuts:update-alias', (_event, id: string, alias: string) =>
+      this.updateAlias(id, alias)
     )
   }
 
@@ -363,6 +367,47 @@ export class LocalShortcutsAPI {
       return { success: true }
     } catch (error) {
       console.error('删除本地启动项失败:', error)
+      return { success: false, error: error instanceof Error ? error.message : '未知错误' }
+    }
+  }
+
+  /**
+   * 更新本地启动项别名
+   */
+  private async updateAlias(
+    id: string,
+    alias: string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      const shortcuts = await this.getAllShortcuts()
+      const shortcut = shortcuts.find((s) => s.id === id)
+
+      if (!shortcut) {
+        return { success: false, error: '未找到该项目' }
+      }
+
+      // 设置别名（空字符串则清除别名）
+      const trimmedAlias = alias.trim()
+      shortcut.alias = trimmedAlias || undefined
+
+      // 重新生成拼音（基于 alias || name）
+      const displayName = shortcut.alias || shortcut.name
+      shortcut.pinyin = getPinyin(displayName, { toneType: 'none', type: 'array' }).join('')
+      shortcut.pinyinAbbr = getPinyin(displayName, { pattern: 'first', toneType: 'none' })
+        .split(' ')
+        .join('')
+
+      // 保存到数据库
+      await databaseAPI.dbPut(LOCAL_SHORTCUTS_KEY, shortcuts)
+
+      console.log('更新本地启动项别名成功:', shortcut.name, '->', shortcut.alias || '(无别名)')
+
+      // 通知渲染进程刷新指令列表
+      this.mainWindow?.webContents.send('apps-changed')
+
+      return { success: true }
+    } catch (error) {
+      console.error('更新本地启动项别名失败:', error)
       return { success: false, error: error instanceof Error ? error.message : '未知错误' }
     }
   }

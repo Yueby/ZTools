@@ -10,8 +10,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
-import { useColorScheme } from '../../composables/useColorScheme';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useColorScheme } from '../../composables/useColorScheme'
 
 const props = defineProps<{
   src: string

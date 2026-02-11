@@ -278,7 +278,9 @@ module.exports = async function (context) {
             const size = await getFolderSize(x64ModulePath)
             await fs.remove(x64ModulePath)
             deletedSize += size
-            console.log(`  已删除 x64 模块: lmdb-darwin-x64 (${(size / 1024 / 1024).toFixed(2)} MB)`)
+            console.log(
+              `  已删除 x64 模块: lmdb-darwin-x64 (${(size / 1024 / 1024).toFixed(2)} MB)`
+            )
           }
         }
 
@@ -305,7 +307,9 @@ module.exports = async function (context) {
             const size = await getFolderSize(modulePath)
             await fs.remove(modulePath)
             deletedSize += size
-            console.log(`  已删除 macOS 模块: ${moduleName} (${(size / 1024 / 1024).toFixed(2)} MB)`)
+            console.log(
+              `  已删除 macOS 模块: ${moduleName} (${(size / 1024 / 1024).toFixed(2)} MB)`
+            )
           }
         }
       }

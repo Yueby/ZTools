@@ -4,20 +4,22 @@
       <slot></slot>
     </div>
 
-    <Transition name="dropdown-menu">
-      <div v-if="isOpen" class="dropdown-menu" :style="menuStyle">
-        <div
-          v-for="item in menuItems"
-          :key="item.key"
-          class="dropdown-item"
-          :class="{ danger: item.danger }"
-          @click="handleItemClick(item)"
-        >
-          <Icon v-if="item.icon" :name="item.icon" :size="14" class="item-icon" />
-          <span class="item-label">{{ item.label }}</span>
+    <Teleport to="body">
+      <Transition name="dropdown-menu">
+        <div v-if="isOpen" class="dropdown-menu" :style="menuStyle" @click.stop>
+          <div
+            v-for="item in menuItems"
+            :key="item.key"
+            class="dropdown-item"
+            :class="{ danger: item.danger }"
+            @click="handleItemClick(item)"
+          >
+            <Icon v-if="item.icon" :name="item.icon" :size="14" class="item-icon" />
+            <span class="item-label">{{ item.label }}</span>
+          </div>
         </div>
-      </div>
-    </Transition>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -47,25 +49,57 @@ const isOpen = ref(false)
 const dropdownRef = ref<HTMLElement>()
 const menuStyle = ref<Record<string, string>>({})
 
+// 全局自定义事件名，用于互斥关闭其他下拉菜单
+const CLOSE_EVENT = 'tag-dropdown:close-all'
+
+function updateMenuPosition(): void {
+  const rect = dropdownRef.value?.getBoundingClientRect()
+  if (!rect) return
+
+  const viewportWidth = window.innerWidth
+  const viewportHeight = window.innerHeight
+  const menuWidth = 160 // 预估菜单宽度
+  const menuHeight = 120 // 预估菜单高度
+  const gap = 4
+
+  // 水平位置：默认左对齐，右侧不够则右对齐
+  let left: number
+  if (rect.left + menuWidth > viewportWidth) {
+    left = rect.right - menuWidth
+  } else {
+    left = rect.left
+  }
+
+  // 垂直位置：默认在下方，下方不够则在上方
+  let top: number
+  if (rect.bottom + gap + menuHeight > viewportHeight) {
+    top = rect.top - gap - menuHeight
+  } else {
+    top = rect.bottom + gap
+  }
+
+  menuStyle.value = {
+    position: 'fixed',
+    left: `${left}px`,
+    top: `${top}px`,
+    zIndex: '10000'
+  }
+}
+
 function toggleDropdown(event: MouseEvent): void {
   event.stopPropagation()
-  isOpen.value = !isOpen.value
 
   if (isOpen.value) {
-    // 计算菜单位置，确保不超出视口
-    const rect = dropdownRef.value?.getBoundingClientRect()
-    if (rect) {
-      const viewportWidth = window.innerWidth
-      const menuWidth = 120 // 预估菜单宽度
-
-      // 如果右侧空间不足，向左对齐
-      if (rect.left + menuWidth > viewportWidth) {
-        menuStyle.value = { right: '0', left: 'auto' }
-      } else {
-        menuStyle.value = { left: '0', right: 'auto' }
-      }
-    }
+    isOpen.value = false
+    return
   }
+
+  // 先关闭其他所有下拉菜单
+  document.dispatchEvent(new CustomEvent(CLOSE_EVENT))
+
+  // 再打开当前菜单
+  isOpen.value = true
+  updateMenuPosition()
 }
 
 function handleItemClick(item: MenuItem): void {
@@ -79,12 +113,18 @@ function handleClickOutside(event: MouseEvent): void {
   }
 }
 
+function handleCloseAll(): void {
+  isOpen.value = false
+}
+
 onMounted(() => {
   document.addEventListener('click', handleClickOutside)
+  document.addEventListener(CLOSE_EVENT, handleCloseAll)
 })
 
 onBeforeUnmount(() => {
   document.removeEventListener('click', handleClickOutside)
+  document.removeEventListener(CLOSE_EVENT, handleCloseAll)
 })
 </script>
 
@@ -97,10 +137,11 @@ onBeforeUnmount(() => {
 .tag-wrapper {
   cursor: pointer;
 }
+</style>
 
+<style>
+/* Teleport 到 body 后不能用 scoped，使用全局样式 */
 .dropdown-menu {
-  position: absolute;
-  top: calc(100% + 4px);
   min-width: 100px;
   background: rgba(255, 255, 255, 0.98);
   border: 1px solid var(--control-border);
@@ -108,7 +149,6 @@ onBeforeUnmount(() => {
   backdrop-filter: blur(100px) saturate(200%) brightness(110%);
   -webkit-backdrop-filter: blur(100px) saturate(200%) brightness(110%);
   overflow: hidden;
-  z-index: 1000;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
@@ -144,12 +184,12 @@ onBeforeUnmount(() => {
   background: var(--danger-light-bg, rgba(239, 68, 68, 0.1));
 }
 
-.item-icon {
+.dropdown-item .item-icon {
   flex-shrink: 0;
   opacity: 0.8;
 }
 
-.item-label {
+.dropdown-item .item-label {
   flex: 1;
   white-space: nowrap;
 }

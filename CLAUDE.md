@@ -400,6 +400,7 @@ interface DbDoc {
 - `CLIPBOARD/` - 剪贴板历史（未使用，改用附件存储）
 
 **注意**：通过 `window.ztools.dbGet(key)` 和 `window.ztools.dbPut(key, data)` 访问的键会自动添加 `ZTOOLS/` 前缀，例如：
+
 - `dbGet('settings-general')` → 实际读取 `ZTOOLS/settings-general`
 - `dbPut('detachedWindowSizes', data)` → 实际写入 `ZTOOLS/detachedWindowSizes`
 
@@ -578,10 +579,12 @@ webdavClient.ts (WebDAV 客户端)
 ```
 
 **同步的数据**：
+
 - 通用设置（`ZTOOLS/settings-general`）✅
 - 所有插件数据（`PLUGIN/` 前缀）✅
 
 **不同步的数据**（隐私保护）：
+
 - ❌ 命令历史（`ZTOOLS/command-history`）
 - ❌ 固定指令列表（`ZTOOLS/pinned-commands`）
 
@@ -828,9 +831,7 @@ class InternalPluginLoader {
 
   // 加载所有内置插件
   loadInternalPlugins(): Plugin[] {
-    return INTERNAL_PLUGINS
-      .filter(p => p.enabled)
-      .map(p => this.loadPlugin(p.dirName))
+    return INTERNAL_PLUGINS.filter((p) => p.enabled).map((p) => this.loadPlugin(p.dirName))
   }
 }
 ```
@@ -839,7 +840,7 @@ class InternalPluginLoader {
 
 ```yaml
 asarUnpack:
-  - internal-plugins/**  # 内置插件不打包到 asar，方便热更新
+  - internal-plugins/** # 内置插件不打包到 asar，方便热更新
 ```
 
 **当前内置插件**：
