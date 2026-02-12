@@ -354,56 +354,7 @@ export const useCommandDataStore = defineStore('commandData', () => {
 
       for (const plugin of plugins) {
         if (plugin.features && Array.isArray(plugin.features) && plugin.features.length > 0) {
-          // 检查是否有 feature 的 cmd 名称与插件名称相同
-          const hasPluginNameCmd = plugin.features.some((feature: any) =>
-            feature.cmds?.some(
-              (cmd: any) => (typeof cmd === 'string' ? cmd : cmd.label) === plugin.name
-            )
-          )
-
-          // 1. 插件名称本身作为一个指令（不关联具体 feature）
-          // 如果已经有同名的 feature cmd，则跳过插件名称指令，避免重复
-          if (!hasPluginNameCmd) {
-            let defaultFeatureCode: string | undefined = undefined
-            let defaultFeatureExplain: string | undefined = undefined
-            // 如果插件没有指定 main，则默认启动第一个非匹配指令的功能
-            if (!plugin.main && plugin.features) {
-              for (const feature of plugin.features) {
-                if (feature.cmds && Array.isArray(feature.cmds)) {
-                  // 查找是否存在字符串类型的指令（即普通文本指令）
-                  const hasTextCmd = feature.cmds.some((cmd: any) => typeof cmd === 'string')
-                  if (hasTextCmd) {
-                    defaultFeatureCode = feature.code
-                    defaultFeatureExplain = feature.explain
-                    break
-                  }
-                }
-              }
-            }
-
-            pluginItems.push({
-              name: plugin.name,
-              path: plugin.path,
-              icon: plugin.logo,
-              type: 'plugin',
-              featureCode: defaultFeatureCode,
-              pluginName: plugin.name,
-              pluginTitle: plugin.title,
-              pluginExplain: defaultFeatureExplain || plugin.description,
-              pinyin: pinyin(plugin.name, { toneType: 'none', type: 'string' })
-                .replace(/\s+/g, '')
-                .toLowerCase(),
-              pinyinAbbr: pinyin(plugin.name, {
-                pattern: 'first',
-                toneType: 'none',
-                type: 'string'
-              })
-                .replace(/\s+/g, '')
-                .toLowerCase()
-            })
-          }
-
-          // 2. 每个 feature 的每个 cmd 都作为独立的指令
+          // 每个 feature 的每个 cmd 都作为独立的指令
           for (const feature of plugin.features) {
             if (feature.cmds && Array.isArray(feature.cmds)) {
               // 优先使用 feature 的 icon，如果没有则使用 plugin 的 logo
