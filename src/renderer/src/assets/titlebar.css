@@ -14,6 +14,7 @@
   --input-focus: #0284c7;
   --input-focus-bg: rgba(0, 0, 0, 0.08);
   --hover-bg: #f9fafb;
+  --primary-color: #0284c7;
 }
 
 /* Windows 下根据 data-material 属性应用不同材质样式 */
@@ -50,13 +51,14 @@
     --input-focus: #0284c7;
     --input-focus-bg: rgba(0, 0, 0, 0.3);
     --hover-bg: #374151;
+    --primary-color: #38bdf8;
   }
 
   /* Windows 暗色模式下根据 data-material 属性应用不同材质样式 */
   .os-windows[data-material='mica'] {
     --titlebar-bg: transparent;
     --input-bg: rgba(255, 255, 255, 0.06);
-    --input-focus-bg: rgba(56, 189, 248, 0.12);
+    --input-focus-bg: rgba(255, 255, 255, 0.1);
     --hover-bg: rgba(255, 255, 255, 0.05);
     --win-button-hover: rgba(255, 255, 255, 0.08);
   }
@@ -64,7 +66,7 @@
   .os-windows[data-material='acrylic'] {
     --titlebar-bg: transparent;
     --input-bg: rgba(255, 255, 255, 0.04);
-    --input-focus-bg: rgba(56, 189, 248, 0.12);
+    --input-focus-bg: rgba(255, 255, 255, 0.1);
     --hover-bg: rgba(255, 255, 255, 0.05);
     --win-button-hover: rgba(255, 255, 255, 0.06);
   }

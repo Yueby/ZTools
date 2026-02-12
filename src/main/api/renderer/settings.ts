@@ -1,9 +1,9 @@
 import { app, globalShortcut, ipcMain, nativeTheme } from 'electron'
 import { getCurrentShortcut, updateShortcut } from '../../index.js'
 
-import databaseAPI from '../shared/database'
-import windowManager from '../../managers/windowManager.js'
 import proxyManager from '../../managers/proxyManager.js'
+import windowManager from '../../managers/windowManager.js'
+import databaseAPI from '../shared/database'
 
 /**
  * 设置管理API - 主程序专用
