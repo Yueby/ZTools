@@ -108,6 +108,30 @@
                 </svg>
               </button>
               <button
+                v-if="plugin.isDevelopment"
+                class="icon-btn package-btn"
+                :disabled="isPackaging"
+                title="打包插件为 ZIP"
+                @click.stop="handlePackagePlugin(plugin)"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <polyline points="16 16 12 12 8 16"></polyline>
+                  <line x1="12" y1="12" x2="12" y2="21"></line>
+                  <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"></path>
+                  <polyline points="16 16 12 12 8 16"></polyline>
+                </svg>
+              </button>
+              <button
                 class="icon-btn reload-btn"
                 :disabled="isReloading"
                 title="重新加载 plugin.json 配置文件"
@@ -215,6 +239,7 @@ const isImportingDev = ref(false)
 const isDeleting = ref(false)
 const isKilling = ref(false)
 const isReloading = ref(false)
+const isPackaging = ref(false)
 
 // 详情弹窗状态
 const isDetailVisible = ref(false)
@@ -432,6 +457,26 @@ async function handleReloadPlugin(plugin: any): Promise<void> {
     error(`重载插件失败: ${err.message || '未知错误'}`)
   } finally {
     isReloading.value = false
+  }
+}
+
+// 打包插件
+async function handlePackagePlugin(plugin: any): Promise<void> {
+  if (isPackaging.value) return
+
+  isPackaging.value = true
+  try {
+    const result = await window.ztools.internal.packagePlugin(plugin.path)
+    if (result.success) {
+      success('插件打包成功!')
+    } else if (result.error !== '已取消') {
+      error(`插件打包失败: ${result.error}`)
+    }
+  } catch (err: any) {
+    console.error('打包插件失败:', err)
+    error(`打包插件失败: ${err.message || '未知错误'}`)
+  } finally {
+    isPackaging.value = false
   }
 }
 
@@ -674,6 +719,14 @@ function closePluginDetail(): void {
 
 .folder-btn:hover {
   background: var(--primary-light-bg);
+}
+
+.package-btn {
+  color: var(--purple-color);
+}
+
+.package-btn:hover:not(:disabled) {
+  background: var(--purple-light-bg);
 }
 
 .reload-btn {

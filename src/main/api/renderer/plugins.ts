@@ -639,6 +639,58 @@ export class PluginsAPI {
     }
   }
 
+  // 打包开发中插件为 ZIP
+  public async packagePlugin(pluginPath: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      // 查找插件信息
+      const plugins: any = await databaseAPI.dbGet('plugins')
+      if (!plugins || !Array.isArray(plugins)) {
+        return { success: false, error: '插件列表不存在' }
+      }
+
+      const pluginInfo = plugins.find((p: any) => p.path === pluginPath)
+      if (!pluginInfo) {
+        return { success: false, error: '插件不存在' }
+      }
+
+      if (!pluginInfo.isDevelopment) {
+        return { success: false, error: '仅支持打包开发中的插件' }
+      }
+
+      // 检查插件目录是否存在
+      try {
+        await fs.access(pluginPath)
+      } catch {
+        return { success: false, error: '插件目录不存在' }
+      }
+
+      // 默认文件名
+      const defaultName = `${pluginInfo.name}-v${pluginInfo.version}.tool-plugin`
+
+      // 弹出保存对话框
+      const result = await dialog.showSaveDialog(this.mainWindow!, {
+        title: '保存插件包',
+        defaultPath: defaultName,
+        filters: [{ name: '插件包', extensions: ['tool-plugin'] }]
+      })
+
+      if (result.canceled || !result.filePath) {
+        return { success: false, error: '已取消' }
+      }
+
+      // 创建 ZIP 文件
+      const zip = new AdmZip()
+      zip.addLocalFolder(pluginPath)
+      zip.writeZip(result.filePath)
+
+      console.log('[Plugins] 插件打包成功:', result.filePath)
+      return { success: true }
+    } catch (error: unknown) {
+      console.error('[Plugins] 打包插件失败:', error)
+      return { success: false, error: error instanceof Error ? error.message : '打包失败' }
+    }
+  }
+
   // 获取插件 README.md 内容
   private async getPluginReadme(
     pluginPathOrName: string,

@@ -196,6 +196,13 @@ export class InternalPluginAPI {
       return await databaseAPI.clearPluginData(pluginName)
     })
 
+    ipcMain.handle('internal:package-plugin', async (event, pluginPath: string) => {
+      if (!requireInternalPlugin(this.pluginManager, event)) {
+        throw new PermissionDeniedError('internal:package-plugin')
+      }
+      return await (pluginsAPI as any).packagePlugin(pluginPath)
+    })
+
     // ==================== AI 模型管理 API ====================
     ipcMain.handle('internal:ai-models-get-all', async (event) => {
       if (!requireInternalPlugin(this.pluginManager, event)) {

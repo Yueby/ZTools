@@ -108,6 +108,10 @@ declare global {
           deletedCount?: number
           error?: string
         }>
+        packagePlugin: (pluginPath: string) => Promise<{
+          success: boolean
+          error?: string
+        }>
 
         // 快捷键相关
         startHotkeyRecording: () => Promise<{ success: boolean; error?: string }>
