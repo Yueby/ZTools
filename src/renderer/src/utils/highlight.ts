@@ -237,6 +237,32 @@ function mapPinyinToCharIndices(
 }
 
 /**
+ * 简单子串高亮：在文本中高亮搜索查询的子串匹配
+ * 适用于没有 Fuse.js 匹配信息的场景（如 mainPush 插件结果）
+ * @param text 原始文本
+ * @param query 搜索查询
+ * @returns 包含高亮标签的HTML字符串
+ */
+export function highlightSubstring(text: string, query?: string): string {
+  if (!query || !query.trim()) {
+    return escapeHtml(text)
+  }
+
+  const lowerText = text.toLowerCase()
+  const lowerQuery = query.toLowerCase().trim()
+  const idx = lowerText.indexOf(lowerQuery)
+
+  if (idx === -1) {
+    return escapeHtml(text)
+  }
+
+  const before = escapeHtml(text.substring(0, idx))
+  const matched = escapeHtml(text.substring(idx, idx + lowerQuery.length))
+  const after = escapeHtml(text.substring(idx + lowerQuery.length))
+  return before + '<mark class="highlight">' + matched + '</mark>' + after
+}
+
+/**
  * 转义HTML特殊字符,防止XSS
  */
 function escapeHtml(text: string): string {

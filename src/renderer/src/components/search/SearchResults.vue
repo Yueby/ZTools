@@ -15,6 +15,7 @@
       :best-search-results="bestSearchResults"
       :best-matches="bestMatches"
       :recommendations="recommendations"
+      :main-push-groups="mainPushGroups"
       :display-apps="displayApps"
       :pinned-apps="pinnedApps"
       :window-matched-actions="windowMatchedActions"
@@ -29,6 +30,8 @@
       @select="handleSelectApp"
       @select-window="handleWindowAction"
       @select-recommendation="handleRecommendationSelect"
+      @select-main-push="handleMainPushSelectAction"
+      @enter-main-push-app="handleEnterMainPushApp"
       @contextmenu="handleAppContextMenu"
       @update:pinned-order="updatePinnedOrder"
       @height-changed="emit('height-changed')"
@@ -49,7 +52,8 @@
 
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, toRaw, watch } from 'vue'
+import { useMainPushResults, type MainPushGroup, type MainPushItem } from '../../composables/useMainPushResults'
 import { useNavigation } from '../../composables/useNavigation'
 import { useSearchResults } from '../../composables/useSearchResults'
 import { useCommandDataStore } from '../../stores/commandDataStore'
@@ -107,6 +111,9 @@ const {
 // 使用搜索结果 composable
 const { bestSearchResults, bestMatches, recommendations, allListModeResults } =
   useSearchResults(props)
+
+// 使用 mainPush 结果 composable
+const { mainPushGroups, handleMainPushSelect } = useMainPushResults(props)
 
 // 内部状态
 const scrollContainerRef = ref<HTMLElement>()
@@ -229,6 +236,14 @@ const navigationGrid = computed(() => {
       recommendGrid.forEach((row) => {
         sections.push({ type: 'recommendation', items: row })
       })
+    }
+
+    // mainPush 结果放到最后（每个 group 的每个 item 占一行）
+    for (const group of mainPushGroups.value) {
+      const sectionType = `mainPush:${group.featureKey}`
+      for (const item of group.items) {
+        sections.push({ type: sectionType, items: [item], mainPushGroup: group })
+      }
     }
   } else {
     // 无搜索：最近使用 + 固定栏 + 访达
@@ -390,6 +405,15 @@ function scrollToSelectedItem(): void {
 watch([selectedRow, selectedCol], () => {
   scrollToSelectedItem()
 })
+
+// 监听 mainPush 结果变化，调整窗口高度
+watch(
+  () => mainPushGroups.value,
+  () => {
+    emit('height-changed')
+  },
+  { deep: true }
+)
 
 // 监听固定列表变化，调整窗口高度
 watch(
@@ -593,6 +617,54 @@ async function handleRecommendationSelect(item: any): Promise<void> {
   }
 }
 
+// 处理 mainPush 搜索结果选择
+async function handleMainPushSelectAction(group: MainPushGroup, item: MainPushItem): Promise<void> {
+  try {
+    const shouldEnter = await handleMainPushSelect(group, item, props.searchQuery)
+    if (shouldEnter) {
+      // 构建原始 item（剔除内部展示字段）
+      const rawItem = JSON.parse(JSON.stringify(toRaw(item)))
+      delete rawItem._resolvedIcon
+      // 进入插件
+      await window.ztools.launch({
+        path: group.pluginPath,
+        type: 'plugin',
+        featureCode: group.featureCode,
+        name: group.featureExplain || group.pluginName,
+        cmdType: group.matchedCmdType,
+        param: {
+          payload: props.searchQuery,
+          type: group.matchedCmdType,
+          from: 'main',
+          option: rawItem
+        }
+      })
+    }
+  } catch (error) {
+    console.error('mainPush 选择处理失败:', error)
+  }
+}
+
+// 点击 mainPush 标题行，直接进入插件应用
+async function handleEnterMainPushApp(group: MainPushGroup): Promise<void> {
+  try {
+    await window.ztools.launch({
+      path: group.pluginPath,
+      type: 'plugin',
+      featureCode: group.featureCode,
+      name: group.featureExplain || group.pluginName,
+      cmdType: group.matchedCmdType,
+      param: {
+        payload: props.searchQuery,
+        type: group.matchedCmdType,
+        from: 'main'
+      }
+    })
+  } catch (error) {
+    console.error('mainPush 进入应用失败:', error)
+  }
+}
+
 // 键盘导航
 async function handleKeydown(event: KeyboardEvent): Promise<void> {
   const grid = navigationGrid.value
@@ -608,6 +680,8 @@ async function handleKeydown(event: KeyboardEvent): Promise<void> {
         handleWindowAction(item)
       } else if (currentRow.type === 'recommendation') {
         handleRecommendationSelect(item)
+      } else if (currentRow.type?.startsWith('mainPush:') && currentRow.mainPushGroup) {
+        handleMainPushSelectAction(currentRow.mainPushGroup, item)
       } else {
         handleSelectApp(item)
       }

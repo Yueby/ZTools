@@ -90,6 +90,17 @@ declare global {
       getRunningPlugins: () => Promise<string[]>
       killPlugin: (pluginPath: string) => Promise<{ success: boolean; error?: string }>
       killPluginAndReturn: (pluginPath: string) => Promise<{ success: boolean; error?: string }>
+      // mainPush 功能
+      queryMainPush: (
+        pluginPath: string,
+        featureCode: string,
+        queryData: { code: string; type: string; payload: string }
+      ) => Promise<any[]>
+      selectMainPush: (
+        pluginPath: string,
+        featureCode: string,
+        selectData: { code: string; type: string; payload: string; option: any }
+      ) => Promise<boolean>
       detachPlugin: () => Promise<{ success: boolean; error?: string }>
       sendInputEvent: (event: {
         type: 'keyDown' | 'keyUp' | 'char' | 'mouseDown' | 'mouseUp' | 'mouseMove'

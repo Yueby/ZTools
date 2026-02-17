@@ -61,6 +61,11 @@ const api = {
   killPlugin: (pluginPath: string) => ipcRenderer.invoke('kill-plugin', pluginPath),
   killPluginAndReturn: (pluginPath: string) =>
     ipcRenderer.invoke('kill-plugin-and-return', pluginPath),
+  // mainPush 功能
+  queryMainPush: (pluginPath: string, featureCode: string, queryData: any) =>
+    ipcRenderer.invoke('query-main-push', pluginPath, featureCode, queryData),
+  selectMainPush: (pluginPath: string, featureCode: string, selectData: any) =>
+    ipcRenderer.invoke('select-main-push', pluginPath, featureCode, selectData),
   sendInputEvent: (event: any) => ipcRenderer.invoke('send-input-event', event),
   selectAvatar: () => ipcRenderer.invoke('select-avatar'),
   openSettings: () => ipcRenderer.send('open-settings'),
@@ -404,6 +409,17 @@ declare global {
       getRunningPlugins: () => Promise<string[]>
       killPlugin: (pluginPath: string) => Promise<{ success: boolean; error?: string }>
       killPluginAndReturn: (pluginPath: string) => Promise<{ success: boolean; error?: string }>
+      // mainPush 功能
+      queryMainPush: (
+        pluginPath: string,
+        featureCode: string,
+        queryData: { code: string; type: string; payload: string }
+      ) => Promise<any[]>
+      selectMainPush: (
+        pluginPath: string,
+        featureCode: string,
+        selectData: { code: string; type: string; payload: string; option: any }
+      ) => Promise<boolean>
       sendInputEvent: (event: {
         type: 'keyDown' | 'keyUp' | 'char' | 'mouseDown' | 'mouseUp' | 'mouseMove'
         keyCode?: string

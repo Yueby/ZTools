@@ -85,12 +85,24 @@ export interface Command {
   pluginExplain?: string // 插件功能说明
   matchCmd?: MatchCmd // 匹配指令配置（regex 或 over 或 img 或 files）
   cmdType?: 'text' | 'regex' | 'over' | 'img' | 'files' // cmd类型
+  mainPush?: boolean // 是否为 mainPush 功能（搜索时动态查询插件获取结果）
   matches?: MatchInfo[] // 搜索匹配信息（用于高亮显示）
   matchType?: 'acronym' | 'name' | 'pinyin' | 'pinyinAbbr' // 匹配类型（用于高亮算法选择）
   // 系统设置字段（新增）
   settingUri?: string // ms-settings URI
   category?: string // 分类（用于分组显示）
   confirmDialog?: any // 确认对话框配置
+}
+
+// MainPush 功能信息
+export interface MainPushFeature {
+  pluginPath: string
+  pluginName: string
+  pluginLogo: string
+  featureCode: string
+  featureExplain: string
+  featureIcon?: string
+  cmds: any[]
 }
 
 interface MatchInfo {
@@ -144,6 +156,7 @@ export const useCommandDataStore = defineStore('commandData', () => {
   // 指令列表（用于搜索）
   const commands = ref<Command[]>([]) // 用于 Fuse 模糊搜索的指令列表
   const regexCommands = ref<Command[]>([]) // 只用正则匹配的指令列表
+  const mainPushFeatures = ref<MainPushFeature[]>([]) // mainPush 功能列表
   const loading = ref(false)
   const fuse = ref<Fuse<Command> | null>(null)
   // 是否已初始化
@@ -392,6 +405,7 @@ export const useCommandDataStore = defineStore('commandData', () => {
       // 处理插件：每个 cmd 转换为一个独立指令
       const pluginItems: Command[] = [] // 普通插件指令
       const regexItems: Command[] = [] // 正则匹配指令
+      const mainPushItems: MainPushFeature[] = [] // mainPush 功能列表
 
       for (const plugin of plugins) {
         if (plugin.features && Array.isArray(plugin.features) && plugin.features.length > 0) {
@@ -449,6 +463,20 @@ export const useCommandDataStore = defineStore('commandData', () => {
             if (feature.cmds && Array.isArray(feature.cmds)) {
               // 优先使用 feature 的 icon，如果没有则使用 plugin 的 logo
               const featureIcon = feature.icon || plugin.logo
+              const isMainPush = !!feature.mainPush
+
+              // 收集 mainPush 功能信息
+              if (isMainPush) {
+                mainPushItems.push({
+                  pluginPath: plugin.path,
+                  pluginName: plugin.name,
+                  pluginLogo: plugin.logo || '',
+                  featureCode: feature.code,
+                  featureExplain: feature.explain || '',
+                  featureIcon: featureIcon,
+                  cmds: feature.cmds
+                })
+              }
 
               for (const cmd of feature.cmds) {
                 // cmd 可能是字符串（功能指令）或对象（匹配指令）
@@ -470,6 +498,7 @@ export const useCommandDataStore = defineStore('commandData', () => {
                     pluginExplain: feature.explain,
                     matchCmd: cmd,
                     cmdType: cmd.type, // 标记匹配类型
+                    mainPush: isMainPush,
                     pinyin: pinyin(cmdName, { toneType: 'none', type: 'string' })
                       .replace(/\s+/g, '')
                       .toLowerCase(),
@@ -493,6 +522,7 @@ export const useCommandDataStore = defineStore('commandData', () => {
                     pluginTitle: plugin.title,
                     pluginExplain: feature.explain,
                     cmdType: 'text', // 标记为文本类型
+                    mainPush: isMainPush,
                     pinyin: pinyin(cmdName, { toneType: 'none', type: 'string' })
                       .replace(/\s+/g, '')
                       .toLowerCase(),
@@ -559,6 +589,7 @@ export const useCommandDataStore = defineStore('commandData', () => {
       // 合并所有指令
       commands.value = [...appItems, ...pluginItems, ...settingCommands, ...localShortcuts]
       regexCommands.value = regexItems
+      mainPushFeatures.value = mainPushItems
 
       console.log(
         `加载了 ${appItems.length} 个应用指令, ${pluginItems.length} 个插件指令, ${settingCommands.length} 个系统设置指令, ${localShortcuts.length} 个本地启动项, ${regexItems.length} 个匹配指令`
@@ -1068,12 +1099,87 @@ export const useCommandDataStore = defineStore('commandData', () => {
     await savePinned()
   }
 
+  // ==================== mainPush 相关 ====================
+
+  /**
+   * 获取与搜索查询匹配的 mainPush 功能列表
+   * 根据每个 mainPush feature 的 cmds 定义检查匹配
+   */
+  function getMatchingMainPushFeatures(query: string): Array<MainPushFeature & { matchedCmdType: string }> {
+    if (!query.trim()) return []
+
+    const results: Array<MainPushFeature & { matchedCmdType: string }> = []
+    const seen = new Set<string>()
+
+    for (const feature of mainPushFeatures.value) {
+      const featureKey = `${feature.pluginPath}:${feature.featureCode}`
+      if (seen.has(featureKey)) continue
+
+      let matched = false
+      let matchedCmdType = 'text'
+
+      for (const cmd of feature.cmds) {
+        if (typeof cmd === 'string') {
+          // 文本匹配：检查查询是否部分匹配 cmd 名称（使用 Fuse.js 的结果或简单包含）
+          const cmdLower = cmd.toLowerCase()
+          const queryLower = query.toLowerCase()
+          const cmdPinyin = pinyin(cmd, { toneType: 'none', type: 'string' }).replace(/\s+/g, '').toLowerCase()
+          const cmdPinyinAbbr = pinyin(cmd, { pattern: 'first', toneType: 'none', type: 'string' }).replace(/\s+/g, '').toLowerCase()
+
+          if (
+            cmdLower.includes(queryLower) ||
+            queryLower.includes(cmdLower) ||
+            cmdPinyin.includes(queryLower) ||
+            cmdPinyinAbbr.includes(queryLower)
+          ) {
+            matched = true
+            matchedCmdType = 'text'
+            break
+          }
+        } else if (cmd.type === 'regex') {
+          if (query.length >= (cmd.minLength || 0)) {
+            try {
+              const regexStr = cmd.match.replace(/^\/|\/[gimuy]*$/g, '')
+              if (new RegExp(regexStr).test(query)) {
+                matched = true
+                matchedCmdType = 'regex'
+                break
+              }
+            } catch { /* 忽略无效正则 */ }
+          }
+        } else if (cmd.type === 'over') {
+          const minLen = cmd.minLength ?? 1
+          const maxLen = cmd.maxLength ?? 10000
+          if (query.length >= minLen && query.length <= maxLen) {
+            if (cmd.exclude) {
+              try {
+                const excludeStr = cmd.exclude.replace(/^\/|\/[gimuy]*$/g, '')
+                if (new RegExp(excludeStr).test(query)) continue
+              } catch { /* 忽略 */ }
+            }
+            matched = true
+            matchedCmdType = 'over'
+            break
+          }
+        }
+      }
+
+      if (matched) {
+        seen.add(featureKey)
+        results.push({ ...feature, matchedCmdType })
+      }
+    }
+
+    return results
+  }
+
   return {
     // 状态
     history,
     pinnedCommands,
     commands,
     regexCommands,
+    mainPushFeatures,
     loading,
     isInitialized,
 
@@ -1090,6 +1196,9 @@ export const useCommandDataStore = defineStore('commandData', () => {
     searchWindowCommands,
     reloadUserData,
     applySpecialConfig, // 导出特殊配置应用函数
+
+    // mainPush 相关
+    getMatchingMainPushFeatures,
 
     // 指令历史记录方法（添加由后端处理）
     getRecentCommands,

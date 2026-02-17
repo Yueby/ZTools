@@ -62,12 +62,11 @@ window.ztools = {
       pluginDetachCallbacks.push(callback)
     }
   },
-  // 监听主进程推送消息
-  // TODO: 临时的，需要完善
-  onMainPush: async (callback) => {
-    console.log('插件请求onMainPush')
+  // 监听主搜索推送（mainPush 功能）
+  onMainPush: (callback, selectCallback) => {
+    console.log('插件注册 onMainPush')
     if (callback && typeof callback === 'function') {
-      mainPushCallbacks.push(callback)
+      mainPushCallbacks.push({ callback, selectCallback })
     }
   },
   // 兼容旧api
@@ -665,10 +664,58 @@ electron.ipcRenderer.on('sub-input-change', (event, details) => {
   subInputChangeCallbacks.forEach((cb) => cb(details))
 })
 
-// 监听主进程推送消息
-electron.ipcRenderer.on('main-push', (event, data) => {
-  console.log('收到主进程推送:', data)
-  mainPushCallbacks.forEach((cb) => cb(data))
+// 监听 mainPush 查询请求（搜索时主进程转发）
+electron.ipcRenderer.on('main-push-query', (event, { queryData, callId }) => {
+  try {
+    let allResults = []
+    for (const { callback } of mainPushCallbacks) {
+      try {
+        const results = callback(queryData)
+        if (Array.isArray(results) && results.length > 0) {
+          allResults = allResults.concat(results)
+        }
+      } catch (e) {
+        console.error('mainPush callback error:', e)
+      }
+    }
+    electron.ipcRenderer.send(`main-push-result-${callId}`, {
+      success: true,
+      results: allResults
+    })
+  } catch (error) {
+    electron.ipcRenderer.send(`main-push-result-${callId}`, {
+      success: false,
+      error: error.message
+    })
+  }
+})
+
+// 监听 mainPush 选择事件（用户选择搜索结果时触发）
+electron.ipcRenderer.on('main-push-select', (event, { selectData, callId }) => {
+  try {
+    let shouldEnterPlugin = false
+    for (const { selectCallback } of mainPushCallbacks) {
+      if (selectCallback && typeof selectCallback === 'function') {
+        try {
+          const result = selectCallback(selectData)
+          if (result === true) {
+            shouldEnterPlugin = true
+          }
+        } catch (e) {
+          console.error('mainPush selectCallback error:', e)
+        }
+      }
+    }
+    electron.ipcRenderer.send(`main-push-select-result-${callId}`, {
+      success: true,
+      shouldEnterPlugin
+    })
+  } catch (error) {
+    electron.ipcRenderer.send(`main-push-select-result-${callId}`, {
+      success: false,
+      error: error.message
+    })
+  }
 })
 
 // 监听快捷键录制事件

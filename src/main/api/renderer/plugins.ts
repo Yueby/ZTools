@@ -57,6 +57,32 @@ export class PluginsAPI {
     ipcMain.handle('install-plugin-from-path', (_event, zipPath: string) =>
       this.installPluginFromPath(zipPath)
     )
+    // mainPush 功能：查询插件的动态搜索结果
+    ipcMain.handle(
+      'query-main-push',
+      async (_event, pluginPath: string, featureCode: string, queryData: any) => {
+        try {
+          return await this.pluginManager.queryMainPush(pluginPath, featureCode, queryData)
+        } catch (error: unknown) {
+          console.error('[Plugins] mainPush 查询失败:', error)
+          return []
+        }
+      }
+    )
+
+    // mainPush 功能：通知插件用户选择了搜索结果
+    ipcMain.handle(
+      'select-main-push',
+      async (_event, pluginPath: string, featureCode: string, selectData: any) => {
+        try {
+          return await this.pluginManager.selectMainPush(pluginPath, featureCode, selectData)
+        } catch (error: unknown) {
+          console.error('[Plugins] mainPush 选择失败:', error)
+          return false
+        }
+      }
+    )
+
     ipcMain.handle(
       'call-headless-plugin',
       async (_event, pluginPath: string, featureCode: string, action: any) => {

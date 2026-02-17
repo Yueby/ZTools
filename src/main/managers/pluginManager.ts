@@ -915,6 +915,104 @@ class PluginManager {
     })
   }
 
+  // ==================== mainPush 相关方法 ====================
+
+  /**
+   * 查询插件的 mainPush 回调，获取动态搜索结果
+   * 如果插件尚未加载，会先预加载
+   */
+  public async queryMainPush(
+    pluginPath: string,
+    _featureCode: string,
+    queryData: { code: string; type: string; payload: string }
+  ): Promise<any[]> {
+    // 确保插件已加载
+    let plugin = this.pluginViews.find((v) => v.path === pluginPath)
+    if (!plugin) {
+      await this.preloadPlugin(pluginPath)
+      // 等待 dom-ready（最多 5 秒）
+      plugin = this.pluginViews.find((v) => v.path === pluginPath)
+      if (plugin && !plugin.view.webContents.isDestroyed()) {
+        await new Promise<void>((resolve) => {
+          const timeout = setTimeout(resolve, 5000)
+          if (plugin!.view.webContents.getURL()) {
+            plugin!.view.webContents.once('dom-ready', () => {
+              clearTimeout(timeout)
+              resolve()
+            })
+            // 如果已经 dom-ready 了，上面的事件不会触发，用短延时兜底
+            setTimeout(() => {
+              clearTimeout(timeout)
+              resolve()
+            }, 500)
+          } else {
+            clearTimeout(timeout)
+            resolve()
+          }
+        })
+      }
+    }
+
+    if (!plugin || plugin.view.webContents.isDestroyed()) {
+      return []
+    }
+
+    const callId = `mp_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`
+
+    return new Promise((resolve) => {
+      const timeout = setTimeout(() => resolve([]), 3000) // 3 秒超时
+
+      plugin!.view.webContents.ipc.once(`main-push-result-${callId}`, (_event, result) => {
+        clearTimeout(timeout)
+        if (result.success && Array.isArray(result.results)) {
+          // 处理图标路径：将相对路径转为 file:// URL（保留原始 icon 不变，用 _resolvedIcon 展示）
+          const processed = result.results.map((item: any) => {
+            if (item.icon && !item.icon.startsWith('http') && !item.icon.startsWith('file:') && !item.icon.startsWith('data:')) {
+              return { ...item, _resolvedIcon: pathToFileURL(path.join(pluginPath, item.icon)).href }
+            }
+            return item
+          })
+          resolve(processed)
+        } else {
+          resolve([])
+        }
+      })
+
+      plugin!.view.webContents.send('main-push-query', { queryData, callId })
+    })
+  }
+
+  /**
+   * 通知插件用户选择了 mainPush 结果
+   * @returns 是否需要进入插件界面
+   */
+  public async selectMainPush(
+    pluginPath: string,
+    _featureCode: string,
+    selectData: { code: string; type: string; payload: string; option: any }
+  ): Promise<boolean> {
+    const plugin = this.pluginViews.find((v) => v.path === pluginPath)
+    if (!plugin || plugin.view.webContents.isDestroyed()) {
+      return false
+    }
+
+    const callId = `mps_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`
+
+    return new Promise((resolve) => {
+      const timeout = setTimeout(() => resolve(false), 3000)
+
+      plugin!.view.webContents.ipc.once(
+        `main-push-select-result-${callId}`,
+        (_event, result) => {
+          clearTimeout(timeout)
+          resolve(result.success && result.shouldEnterPlugin)
+        }
+      )
+
+      plugin!.view.webContents.send('main-push-select', { selectData, callId })
+    })
+  }
+
   // 处理插件按 ESC 键
   public handlePluginEsc(): void {
     // 记录 ESC 触发时间

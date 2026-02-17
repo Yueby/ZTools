@@ -90,13 +90,28 @@
         @select="$emit('select-recommendation', $event)"
         @update:expanded="$emit('update:recommendations-expanded', $event)"
       />
+
+      <!-- mainPush 插件搜索结果 -->
+      <MainPushList
+        v-for="group in mainPushGroups"
+        :key="group.featureKey"
+        :title="group.featureExplain || group.pluginName"
+        :icon="group.featureIcon || group.pluginLogo"
+        :items="group.items"
+        :selected-index="getMainPushSelectedIndex(group.featureKey)"
+        :search-query="searchQuery"
+        @select="(item, _index) => $emit('select-main-push', group, item)"
+        @enter-app="$emit('enter-main-push-app', group)"
+      />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import type { MainPushGroup, MainPushItem } from '../../composables/useMainPushResults'
 import CollapsibleList from '../common/CollapsibleList.vue'
+import MainPushList from '../common/MainPushList.vue'
 
 interface Props {
   searchQuery: string
@@ -106,6 +121,7 @@ interface Props {
   bestSearchResults: any[]
   bestMatches: any[]
   recommendations: any[]
+  mainPushGroups: MainPushGroup[]
   displayApps: any[]
   pinnedApps: any[]
   windowMatchedActions: any[]
@@ -136,6 +152,8 @@ defineEmits<{
   select: [app: any]
   'select-window': [item: any]
   'select-recommendation': [item: any]
+  'select-main-push': [group: MainPushGroup, item: MainPushItem]
+  'enter-main-push-app': [group: MainPushGroup]
   contextmenu: [app: any, fromSearch: boolean, fromPinned: boolean]
   'update:pinned-order': [apps: any[]]
   'height-changed': []
@@ -174,6 +192,31 @@ function getAbsoluteIndexForSection(sectionType: string): number {
 
   // 计算相对于起始行的索引
   return (props.selectedRow - startRow) * 9 + props.selectedCol
+}
+
+// 获取 mainPush 分组的选中索引
+function getMainPushSelectedIndex(featureKey: string): number {
+  const grid = props.navigationGrid
+  if (grid.length === 0 || props.selectedRow >= grid.length) {
+    return -1
+  }
+
+  const currentRow = grid[props.selectedRow]
+  const expectedType = `mainPush:${featureKey}`
+  if (currentRow.type !== expectedType) {
+    return -1
+  }
+
+  // mainPush 行每行 1 个项目，直接用行偏移计算索引
+  let startRow = 0
+  for (let i = 0; i < grid.length; i++) {
+    if (grid[i].type === expectedType) {
+      startRow = i
+      break
+    }
+  }
+
+  return props.selectedRow - startRow
 }
 </script>
 
