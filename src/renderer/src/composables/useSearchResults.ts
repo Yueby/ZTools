@@ -1,4 +1,4 @@
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useCommandDataStore } from '../stores/commandDataStore'
 
 /**
@@ -21,6 +21,23 @@ export function deduplicateResults<
 }
 
 /**
+ * 根据使用统计对匹配指令结果排序（useCount 降序）
+ */
+function sortByUsage<T extends { path: string; featureCode?: string }>(
+  results: T[],
+  statsMap: Map<string, number>
+): T[] {
+  if (statsMap.size === 0) return results
+  return [...results].sort((a, b) => {
+    const keyA = `${a.path}:${a.featureCode || ''}`
+    const keyB = `${b.path}:${b.featureCode || ''}`
+    const countA = statsMap.get(keyA) || 0
+    const countB = statsMap.get(keyB) || 0
+    return countB - countA
+  })
+}
+
+/**
  * 搜索结果计算 Composable
  * 统一管理所有搜索结果的计算逻辑
  */
@@ -38,6 +55,33 @@ export function useSearchResults(props: {
   const commandDataStore = useCommandDataStore()
   const { search, searchInCommands, searchImageCommands, searchTextCommands, searchFileCommands } =
     commandDataStore
+
+  // 使用统计缓存（key: "path:featureCode", value: useCount）
+  const usageStatsMap = ref<Map<string, number>>(new Map())
+
+  // 每次搜索条件变化时，异步加载最新的使用统计数据
+  watch(
+    [
+      () => props.searchQuery,
+      () => props.pastedImage,
+      () => props.pastedText,
+      () => props.pastedFiles
+    ],
+    async () => {
+      try {
+        const stats: any[] = await window.ztools.getUsageStats()
+        const map = new Map<string, number>()
+        for (const item of stats) {
+          const key = `${item.path}:${item.featureCode || ''}`
+          map.set(key, item.useCount || 0)
+        }
+        usageStatsMap.value = map
+      } catch (error) {
+        console.error('加载使用统计失败:', error)
+      }
+    },
+    { immediate: true }
+  )
 
   // 统一的搜索结果（只执行一次搜索）
   const unifiedSearchResult = computed(() => {
@@ -75,9 +119,12 @@ export function useSearchResults(props: {
 
       // 如果有搜索关键词，在匹配的指令中搜索
       if (props.searchQuery.trim()) {
-        return searchInCommands(matchedCommands, props.searchQuery)
+        return sortByUsage(
+          searchInCommands(matchedCommands, props.searchQuery),
+          usageStatsMap.value
+        )
       }
-      return matchedCommands
+      return sortByUsage(matchedCommands, usageStatsMap.value)
     }
 
     // 正常搜索
@@ -94,18 +141,24 @@ export function useSearchResults(props: {
     if (props.pastedImage) {
       const matchedCommands = searchImageCommands()
       if (props.searchQuery.trim()) {
-        return searchInCommands(matchedCommands, props.searchQuery)
+        return sortByUsage(
+          searchInCommands(matchedCommands, props.searchQuery),
+          usageStatsMap.value
+        )
       }
-      return matchedCommands
+      return sortByUsage(matchedCommands, usageStatsMap.value)
     }
 
     // 粘贴文件时，返回 files 类型的匹配指令
     if (props.pastedFiles) {
       const matchedCommands = searchFileCommands(props.pastedFiles)
       if (props.searchQuery.trim()) {
-        return searchInCommands(matchedCommands, props.searchQuery)
+        return sortByUsage(
+          searchInCommands(matchedCommands, props.searchQuery),
+          usageStatsMap.value
+        )
       }
-      return matchedCommands
+      return sortByUsage(matchedCommands, usageStatsMap.value)
     }
 
     // 粘贴文本时，返回 regex 类型的匹配指令
@@ -117,9 +170,9 @@ export function useSearchResults(props: {
       })
 
       if (props.searchQuery.trim()) {
-        return searchInCommands(regexMatched, props.searchQuery)
+        return sortByUsage(searchInCommands(regexMatched, props.searchQuery), usageStatsMap.value)
       }
-      return regexMatched
+      return sortByUsage(regexMatched, usageStatsMap.value)
     }
 
     // 普通搜索：过滤出 regex、img、files 类型（排除 over）
@@ -127,10 +180,11 @@ export function useSearchResults(props: {
       return []
     }
 
-    return unifiedSearchResult.value.regexMatches.filter((cmd) => {
+    const filtered = unifiedSearchResult.value.regexMatches.filter((cmd) => {
       const cmdType = cmd.cmdType || cmd.matchCmd?.type
       return cmdType === 'regex' || cmdType === 'img' || cmdType === 'files'
     })
+    return sortByUsage(filtered, usageStatsMap.value)
   })
 
   // 推荐列表（over 类型）
@@ -164,7 +218,9 @@ export function useSearchResults(props: {
     }
 
     // 去重：同一个 feature 只保留第一个匹配的 cmd
-    return deduplicateResults(overTypeResults)
+    const deduplicated = deduplicateResults(overTypeResults)
+    // 按使用频率排序
+    return sortByUsage(deduplicated, usageStatsMap.value)
   })
 
   // 列表模式：合并所有搜索结果
