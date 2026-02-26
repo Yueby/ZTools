@@ -32,7 +32,6 @@ export function httpRequest(url: string, options: HttpRequestOptions = {}): Prom
       method = 'GET',
       headers = {},
       body,
-      maxRedirects = 5,
       validateStatus = (status) => status >= 200 && status < 300
     } = options
 
@@ -44,15 +43,13 @@ export function httpRequest(url: string, options: HttpRequestOptions = {}): Prom
       ...headers // 用户自定义的 headers 会覆盖默认值
     }
 
-    // 处理重定向计数
-    let redirectCount = 0
-    let finalUrl = url
+    const finalUrl = url
 
     const makeRequest = (requestUrl: string): void => {
       const request = net.request({
         method,
         url: requestUrl,
-        redirect: 'manual', // 手动处理重定向
+        redirect: 'follow', // 自动跟随重定向（manual 模式在某些 Electron 版本会导致 Redirect was cancelled 错误）
         session: session.defaultSession // 显式指定使用 defaultSession（确保代理配置生效）
       })
 
@@ -70,19 +67,6 @@ export function httpRequest(url: string, options: HttpRequestOptions = {}): Prom
         Object.entries(response.headers).forEach(([key, value]) => {
           responseHeaders[key] = value
         })
-
-        // 处理重定向
-        if (response.statusCode >= 300 && response.statusCode < 400) {
-          const location = response.headers['location']
-          if (location && redirectCount < maxRedirects) {
-            redirectCount++
-            // 解析重定向 URL
-            const redirectUrl = Array.isArray(location) ? location[0] : location
-            finalUrl = new URL(redirectUrl, requestUrl).toString()
-            makeRequest(finalUrl)
-            return
-          }
-        }
 
         // 收集响应数据
         response.on('data', (chunk: Buffer) => {

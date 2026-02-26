@@ -1005,13 +1005,15 @@ export class PluginsAPI {
 
       console.log('[Plugins] 从远程加载 README:', readmeUrl)
 
-      // 使用 fetch 获取 README 内容
-      const response = await fetch(readmeUrl)
-      if (!response.ok) {
+      // 使用 httpGet 获取 README 内容（走系统代理）
+      const response = await httpGet(readmeUrl, {
+        validateStatus: (status) => status >= 200 && status < 400
+      })
+      if (response.status >= 300) {
         return { success: false, error: '暂无详情' }
       }
 
-      let content = await response.text()
+      let content = typeof response.data === 'string' ? response.data : JSON.stringify(response.data)
 
       // 替换 Markdown 图片语法：![alt](path)
       content = content.replace(/!\[([^\]]*)\]\((?!http)([^)]+)\)/g, (_match, alt, path) => {
