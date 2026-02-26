@@ -91,9 +91,9 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 // 添加 Chromium 命令行开关，禁用跨域限制
-app.commandLine.appendSwitch('disable-features', 'OutOfBlinkCors')
-app.commandLine.appendSwitch('disable-site-isolation-trials')
-app.commandLine.appendSwitch('disable-web-security')
+// app.commandLine.appendSwitch('disable-features', 'OutOfBlinkCors')
+// app.commandLine.appendSwitch('disable-site-isolation-trials')
+// app.commandLine.appendSwitch('disable-web-security')
 
 // 导出函数供 API 使用
 export function updateShortcut(shortcut: string): boolean {
