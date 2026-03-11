@@ -656,7 +656,7 @@ export class AppsAPI {
       }
 
       // 读取历史记录
-      let history: any[] = databaseAPI.dbGet('command-history') || []
+      const history: any[] = databaseAPI.dbGet('command-history') || []
 
       // 查找是否已存在（非插件类型需要同时匹配 name 和 path，支持同路径不同名应用）
       const existingIndex = findCommandIndex(history, appPath, type, featureCode, appInfo.name)
@@ -679,11 +679,6 @@ export class AppsAPI {
 
       // 按最近使用时间排序
       history.sort((a, b) => b.lastUsed - a.lastUsed)
-
-      // 限制历史记录数量（最多 27 个）
-      if (history.length > 27) {
-        history = history.slice(0, 27)
-      }
 
       // 保存历史记录
       databaseAPI.dbPut('command-history', history)
