@@ -34,6 +34,7 @@ interface PluginViewInfo {
   logo?: string
   isDevelopment?: boolean
   backgroundRunning?: boolean // plugin.json pluginSetting.backgroundRunning，后台不节流
+  single?: boolean // plugin.json pluginSetting.single, true/默认 = 单例不可多开, false = 允许多开
 }
 
 export class PluginManager {
@@ -60,6 +61,20 @@ export class PluginManager {
   private readPluginConfig(pluginPath: string): any {
     const pluginJsonPath = path.join(pluginPath, 'plugin.json')
     return JSON.parse(fsSync.readFileSync(pluginJsonPath, 'utf-8'))
+  }
+
+  /**
+   * 判断插件是否允许多开（pluginSetting.single 默认/true = 不可多开, false = 允许多开）
+   */
+  private isPluginMultiOpenAllowed(pluginPath: string): boolean {
+    const cached = this.pluginViews.find((v) => v.path === pluginPath)
+    if (cached) return cached.single === false
+    try {
+      const pluginConfig = this.readPluginConfig(pluginPath)
+      return pluginConfig.pluginSetting?.single === false
+    } catch {
+      return false
+    }
   }
 
   /**
@@ -264,6 +279,15 @@ export class PluginManager {
       return
     }
 
+    // 单例检查：插件不允许多开 且 已有分离窗口 → 聚焦已有窗口
+    if (!this.isPluginMultiOpenAllowed(pluginPath)) {
+      if (detachedWindowManager.focusByPlugin(pluginPath)) {
+        console.log('[Plugin] 插件不允许多开，聚焦已有分离窗口:', pluginPath)
+        this.assemblyCoordinator.abortCurrentSession('singleton-focus-detached')
+        return
+      }
+    }
+
     // 先尝试从缓存中复用已有视图
     const cached = this.pluginViews.find((v) => v.path === pluginPath)
     if (cached) {
@@ -407,7 +431,8 @@ export class PluginManager {
         subInputVisible: false,
         logo: logoUrl,
         isDevelopment,
-        backgroundRunning: !!pluginConfig.pluginSetting?.backgroundRunning
+        backgroundRunning: !!pluginConfig.pluginSetting?.backgroundRunning,
+        single: pluginConfig.pluginSetting?.single
       }
       this.pluginViews.push(pluginInfo)
       this.currentPluginPath = pluginPath
@@ -664,7 +689,8 @@ export class PluginManager {
         subInputVisible: false,
         logo: logoUrl,
         isDevelopment,
-        backgroundRunning: !!pluginConfig.pluginSetting?.backgroundRunning
+        backgroundRunning: !!pluginConfig.pluginSetting?.backgroundRunning,
+        single: pluginConfig.pluginSetting?.single
       }
       this.pluginViews.push(pluginInfo)
 
@@ -1340,6 +1366,14 @@ export class PluginManager {
   ): Promise<{ success: boolean; error?: string }> {
     try {
       console.log('[Plugin] 直接在独立窗口中创建插件:', { pluginPath, featureCode })
+
+      // 单例检查：插件不允许多开 且 已有分离窗口 → 聚焦已有窗口
+      if (!this.isPluginMultiOpenAllowed(pluginPath)) {
+        if (detachedWindowManager.focusByPlugin(pluginPath)) {
+          console.log('[Plugin] 插件不允许多开，聚焦已有分离窗口:', pluginPath)
+          return { success: true }
+        }
+      }
 
       const pluginInfoFromDB = this.fetchPluginInfoFromDB(pluginPath)
       const pluginConfig = this.readPluginConfig(pluginPath)
