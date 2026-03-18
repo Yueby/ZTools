@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { marked } from 'marked'
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useToast, DetailPanel, CommandTag, FeatureCard } from '@/components'
 
 interface PluginFeature {
@@ -169,8 +169,37 @@ async function toggleAutoStart(): Promise<void> {
 }
 
 // Tab 状态
-type TabId = 'detail' | 'commands' | 'data'
+type TabId = 'detail' | 'commands' | 'data' | 'comments'
 const activeTab = ref<TabId>('detail')
+
+// Giscus 评论容器
+const giscusRef = ref<HTMLDivElement>()
+
+function loadGiscus(): void {
+  const container = giscusRef.value
+  if (!container) return
+
+  container.innerHTML = ''
+
+  const script = document.createElement('script')
+  script.src = 'https://giscus.app/client.js'
+  script.setAttribute('data-repo', 'ZToolsCenter/ZTools')
+  script.setAttribute('data-repo-id', 'R_kgDOQhlrNw')
+  script.setAttribute('data-category', 'Comments')
+  script.setAttribute('data-category-id', 'DIC_kwDOQhlrN84C4mww')
+  script.setAttribute('data-mapping', 'specific')
+  script.setAttribute('data-term', props.plugin.name || 'unknown')
+  script.setAttribute('data-strict', '0')
+  script.setAttribute('data-reactions-enabled', '1')
+  script.setAttribute('data-emit-metadata', '0')
+  script.setAttribute('data-input-position', 'bottom')
+  script.setAttribute('data-theme', 'preferred_color_scheme')
+  script.setAttribute('data-lang', 'zh-CN')
+  script.setAttribute('crossorigin', 'anonymous')
+  script.async = true
+
+  container.appendChild(script)
+}
 
 // README 状态
 const readmeContent = ref<string>('')
@@ -214,6 +243,8 @@ const availableTabs = computed(() => {
     tabs.push({ id: 'data' as TabId, label: '数据' })
   }
 
+  tabs.push({ id: 'comments' as TabId, label: '留言' })
+
   return tabs
 })
 
@@ -224,6 +255,11 @@ function switchTab(tabId: TabId): void {
   // 切换到数据 Tab 时加载数据
   if (tabId === 'data' && !docKeys.value.length && !dataLoading.value) {
     loadPluginData()
+  }
+
+  // 切换到留言 Tab 时加载 Giscus
+  if (tabId === 'comments') {
+    nextTick(() => loadGiscus())
   }
 }
 
@@ -1029,6 +1065,11 @@ watch(
           </div>
           <div v-else class="empty-message">该插件暂无存储数据</div>
         </div>
+
+        <!-- 留言 Tab -->
+        <div v-if="activeTab === 'comments'" class="tab-panel comments-panel">
+          <div ref="giscusRef" class="giscus"></div>
+        </div>
       </div>
     </div>
   </DetailPanel>
@@ -1701,5 +1742,17 @@ watch(
 .expand-leave-to {
   max-height: 0;
   opacity: 0;
+}
+
+/* 留言 Tab */
+.comments-panel {
+  padding: 0 12px;
+}
+
+.comments-panel :deep(.giscus-frame) {
+  width: 100%;
+  min-height: 360px;
+  border: none;
+  color-scheme: auto;
 }
 </style>

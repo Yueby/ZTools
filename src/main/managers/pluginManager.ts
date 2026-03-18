@@ -10,6 +10,7 @@ import { WINDOW_INITIAL_HEIGHT, WINDOW_DEFAULT_HEIGHT, WINDOW_WIDTH } from '../c
 import detachedWindowManager, { DETACHED_TITLEBAR_HEIGHT } from '../core/detachedWindowManager'
 import { GLOBAL_SCROLLBAR_CSS } from '../core/globalStyles'
 import { isInternalPlugin } from '../core/internalPlugins'
+import { getInternalPluginUrl, getInternalPluginServerPort } from '../core/internalPluginServer'
 import pluginWindowManager from '../core/pluginWindowManager'
 import { registerIconProtocolForSession } from '../core/iconProtocol'
 import lmdbInstance from '../core/lmdb/lmdbInstance'
@@ -140,6 +141,12 @@ export class PluginManager {
     if (pluginConfig.main.startsWith('http')) {
       console.log('[Plugin] 网络插件:', pluginConfig.main)
       return { pluginUrl: pluginConfig.main, isConfigHeadless }
+    }
+    // 生产环境内置插件：使用本地 HTTP server 加载（避免 file:// 下的 CSP 限制）
+    if (isInternalPlugin(pluginConfig.name) && getInternalPluginServerPort() > 0) {
+      const httpUrl = getInternalPluginUrl(pluginConfig.name, pluginConfig.main)
+      console.log('[Plugin] 内置插件使用 HTTP server:', httpUrl)
+      return { pluginUrl: httpUrl, isConfigHeadless }
     }
     return {
       pluginUrl: pathToFileURL(path.join(pluginPath, pluginConfig.main)).href,

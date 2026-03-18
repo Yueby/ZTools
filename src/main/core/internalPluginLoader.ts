@@ -4,6 +4,7 @@ import path from 'path'
 import { pathToFileURL } from 'url'
 import api from '../api/index'
 import { INTERNAL_PLUGIN_NAMES, getInternalPluginPath } from './internalPlugins'
+import { getInternalPluginUrl, getInternalPluginServerPort } from './internalPluginServer'
 
 /**
  * 加载所有内置插件
@@ -44,8 +45,13 @@ export function loadInternalPlugins(): void {
 
       // 构建插件信息
       const logoPath = pluginConfig.logo ? path.join(effectivePluginPath, pluginConfig.logo) : ''
+
+      // 生产环境且 server 已启动时，使用 HTTP URL 加载插件（避免 file:// 下的 CSP 限制）
+      const serverPort = getInternalPluginServerPort()
       const mainPath = pluginConfig.main
-        ? path.join(effectivePluginPath, pluginConfig.main)
+        ? serverPort > 0
+          ? getInternalPluginUrl(pluginName, pluginConfig.main)
+          : path.join(effectivePluginPath, pluginConfig.main)
         : undefined
 
       const pluginInfo = {

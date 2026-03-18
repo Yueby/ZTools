@@ -780,9 +780,7 @@ export class SyncEngine {
   /**
    * 同步插件文件
    */
-  private async syncPlugins(
-    config: SyncConfig
-  ): Promise<{
+  private async syncPlugins(config: SyncConfig): Promise<{
     pluginsUploaded: number
     pluginsDownloaded: number
     pluginsDeleted: number

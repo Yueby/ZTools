@@ -9,6 +9,7 @@ import floatingBallManager from './core/floatingBallManager'
 import httpServer from './core/httpServer'
 import { registerIconProtocolForSession, registerIconScheme } from './core/iconProtocol'
 import { loadInternalPlugins } from './core/internalPluginLoader'
+import { startInternalPluginServer } from './core/internalPluginServer'
 import pluginManager from './managers/pluginManager'
 import windowManager from './managers/windowManager'
 
@@ -94,9 +95,12 @@ export function getCurrentShortcut(): string {
   return windowManager.getCurrentShortcut()
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   // 注册自定义图标协议到默认 session (ztools-icon://)
   registerIconProtocolForSession(session.defaultSession)
+
+  // 启动内置插件本地 HTTP server（仅生产环境，解决 file:// 下的 CSP 限制）
+  await startInternalPluginServer()
 
   // ✅ 首先加载内置插件
   loadInternalPlugins()
