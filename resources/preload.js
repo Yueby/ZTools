@@ -929,12 +929,22 @@ window.ztools = {
   /**
    * 执行 FFmpeg 命令（在插件进程中直接 spawn）
    * @param {string[]} args - FFmpeg 命令行参数
-   * @param {Function} [onProgress] - 进度回调，接收 {time, speed, percent, ...} 对象
+   * @param {Function|Object} [options] - 回调函数（兼容旧版）或选项对象 { onProgress, onLog }
    * @returns {Promise<void> & {kill: Function, quit: Function}} 可终止的 Promise
    */
-  runFFmpeg: (args, onProgress) => {
-    if (!Array.isArray(args) || (onProgress !== undefined && typeof onProgress !== 'function'))
-      throw new Error('参数错误')
+  runFFmpeg: (args, options) => {
+    if (!Array.isArray(args)) throw new Error('参数错误')
+
+    let onProgress, onLog
+
+    // 兼容旧版：第二参数为函数时视为 onProgress
+    if (typeof options === 'function') {
+      onProgress = options
+    } else if (options) {
+      if (typeof options !== 'object') throw new Error('参数错误')
+      if (typeof options.onLog === 'function') onLog = options.onLog
+      if (typeof options.onProgress === 'function') onProgress = options.onProgress
+    }
 
     let proc = null
     let killed = false
@@ -943,7 +953,9 @@ window.ztools = {
       ipcInvoke('getFFmpegPath')
         .then((ffmpegPath) => {
           try {
-            proc = require('child_process').spawn(ffmpegPath, args)
+            proc = require('child_process').spawn(ffmpegPath, args, {
+              stdio: ['pipe', 'ignore', 'pipe']
+            })
           } catch (e) {
             return reject(e)
           }
@@ -957,6 +969,8 @@ window.ztools = {
           proc.stderr.on('data', (data) => {
             const text = data.toString()
             const trimmed = text.trim()
+
+            if (onLog) onLog(trimmed)
 
             // ffmpeg 覆盖已存在文件时会询问 [y/N]，自动回答 N 拒绝覆盖
             if (
@@ -973,7 +987,9 @@ window.ztools = {
             // 从 stderr 头部解析输入文件总时长，用于计算进度百分比
             if (onProgress && totalDuration === null) {
               const m = trimmed.match(/Duration:\s*(\d+):(\d{2}):(\d{2}(?:\.\d+)?)/)
-              if (m) totalDuration = 3600 * parseInt(m[1]) + 60 * parseInt(m[2]) + parseFloat(m[3])
+              if (m)
+                totalDuration =
+                  3600 * parseInt(m[1], 10) + 60 * parseInt(m[2], 10) + parseFloat(m[3])
             }
 
             // 解析 ffmpeg 进度行（格式: "frame=... fps=... time=00:01:23 ..."）
@@ -990,7 +1006,8 @@ window.ztools = {
                 })
                 if (info.time && totalDuration) {
                   const tp = info.time.split(':')
-                  const cur = 3600 * parseInt(tp[0]) + 60 * parseInt(tp[1]) + parseFloat(tp[2])
+                  const cur =
+                    3600 * parseInt(tp[0], 10) + 60 * parseInt(tp[1], 10) + parseFloat(tp[2])
                   info.percent = (cur / totalDuration) * 100
                 }
                 if (info.time) onProgress(info)
