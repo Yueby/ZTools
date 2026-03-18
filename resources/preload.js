@@ -921,7 +921,135 @@ window.ztools = {
    */
   clearUBrowserCache: () => ipcInvoke('clearZBrowserCache'),
   /** ubrowserLogin 兼容桩（ZTools 暂不支持，返回 null） */
-  ubrowserLogin: () => ipcInvoke('ubrowserLogin')
+  ubrowserLogin: () => ipcInvoke('ubrowserLogin'),
+  // ── FFmpeg API ──
+  // 注意：runFFmpeg 在 preload 端直接 spawn 子进程，而非走 IPC 转发到主进程。
+  // 原因：onProgress 回调需要实时推送 stderr 数据，走 IPC 会引入延迟且无法直接传递回调函数。
+
+  /**
+   * 执行 FFmpeg 命令（在插件进程中直接 spawn）
+   * @param {string[]} args - FFmpeg 命令行参数
+   * @param {Function} [onProgress] - 进度回调，接收 {time, speed, percent, ...} 对象
+   * @returns {Promise<void> & {kill: Function, quit: Function}} 可终止的 Promise
+   */
+  runFFmpeg: (args, onProgress) => {
+    if (!Array.isArray(args) || (onProgress !== undefined && typeof onProgress !== 'function'))
+      throw new Error('参数错误')
+
+    let proc = null
+    let killed = false
+
+    const promise = new Promise((resolve, reject) => {
+      ipcInvoke('getFFmpegPath')
+        .then((ffmpegPath) => {
+          try {
+            proc = require('child_process').spawn(ffmpegPath, args)
+          } catch (e) {
+            return reject(e)
+          }
+
+          // 保留最近几行 stderr 输出，用于错误退出时提取错误信息
+          const MAX_ERROR_LINES = 5
+          const lines = []
+          let answeredYN = false
+          let totalDuration = null
+
+          proc.stderr.on('data', (data) => {
+            const text = data.toString()
+            const trimmed = text.trim()
+
+            // ffmpeg 覆盖已存在文件时会询问 [y/N]，自动回答 N 拒绝覆盖
+            if (
+              trimmed.endsWith(']') &&
+              ((lines.length > 0 ? lines[lines.length - 1] : '') + trimmed).endsWith('[y/N]')
+            ) {
+              answeredYN = true
+              try {
+                proc.stdin.write('N\n')
+              } catch {}
+              return
+            }
+
+            // 从 stderr 头部解析输入文件总时长，用于计算进度百分比
+            if (onProgress && totalDuration === null) {
+              const m = trimmed.match(/Duration:\s*(\d+):(\d{2}):(\d{2}(?:\.\d+)?)/)
+              if (m) totalDuration = 3600 * parseInt(m[1]) + 60 * parseInt(m[2]) + parseFloat(m[3])
+            }
+
+            // 解析 ffmpeg 进度行（格式: "frame=... fps=... time=00:01:23 ..."）
+            if (/time=\d+:\d{2}:\d{2}/.test(trimmed)) {
+              if (onProgress) {
+                const info = {}
+                // 按非值内空格分割 key=value 对（跳过 "=" 或值内的空格）
+                trimmed.split(/(?<!(?:=|\s))\s/).forEach((pair) => {
+                  const kv = pair.split('=')
+                  if (kv.length === 2) {
+                    const v = kv[1].trim()
+                    info[kv[0].trim()] = /^-?\d+(\.\d+)?$/.test(v) ? Number(v) : v
+                  }
+                })
+                if (info.time && totalDuration) {
+                  const tp = info.time.split(':')
+                  const cur = 3600 * parseInt(tp[0]) + 60 * parseInt(tp[1]) + parseFloat(tp[2])
+                  info.percent = (cur / totalDuration) * 100
+                }
+                if (info.time) onProgress(info)
+              }
+            } else {
+              lines.push(text)
+              if (lines.length > MAX_ERROR_LINES) lines.shift()
+            }
+          })
+
+          proc.on('close', (code) => {
+            if (killed) return reject(new Error('已被主动终止'))
+            if (code !== 0 || answeredYN) {
+              if (lines.length === 0)
+                return reject(new Error(`ffmpeg process exited with code ${code}`))
+              let msg
+              if (lines.length > 1) lines.shift()
+              if (answeredYN) {
+                // 自动拒绝覆盖后，提取最后一行的错误描述（去掉 ffmpeg 模块前缀）
+                msg = lines[lines.length - 1].replace(/^\[[^\]]+ @ [^\]]+\]\s*/gm, '')
+              } else {
+                const combined = lines.join('').trim()
+                const errs = combined
+                  .split('\n')
+                  .filter((l) => /error|invalid|failed|no such file|unable/i.test(l))
+                  .map((l) => l.replace(/^\[[^\]]+ @ [^\]]+\]\s*/, '').trim())
+                msg = errs.length === 0 ? combined : errs.join('\n')
+              }
+              reject(new Error(msg))
+            } else {
+              resolve()
+            }
+          })
+
+          proc.on('error', reject)
+        })
+        .catch(reject)
+    })
+
+    /** 强制终止 ffmpeg 进程（SIGTERM） */
+    promise.kill = () => {
+      if (!proc) throw new Error('未运行')
+      if (proc.exitCode !== null) throw new Error('已结束运行')
+      killed = true
+      proc.kill()
+    }
+
+    /** 向 ffmpeg stdin 发送 'q' 优雅退出 */
+    promise.quit = () => {
+      if (!proc) throw new Error('未运行')
+      if (proc.exitCode !== null) throw new Error('已结束运行')
+      try {
+        proc.stdin.write('q\n')
+        proc.stdin.end()
+      } catch {}
+    }
+
+    return promise
+  }
 }
 
 electron.ipcRenderer.on('on-plugin-enter', (event, launchParam) => {
