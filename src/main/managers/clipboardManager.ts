@@ -4,9 +4,14 @@ import { promises as fs } from 'fs'
 import path from 'path'
 
 import os from 'os'
-import plist from 'simple-plist'
 import { v4 as uuidv4 } from 'uuid'
 import lmdbInstance from '../core/lmdb/lmdbInstance'
+import {
+  hasClipboardFiles,
+  readClipboardFilePaths,
+  readClipboardFiles,
+  writeClipboardFiles
+} from '../utils/clipboardFiles'
 import pluginManager from './pluginManager'
 import ClipboardMonitor, { WindowMonitor, WindowManager } from '../core/native'
 // 剪贴板类型
@@ -190,17 +195,11 @@ class ClipboardManager {
       // 优先级：文件 > 图片 > 文本
       // 跨平台文件检测
       let hasFiles = false
-      if (os.platform() === 'darwin') {
-        hasFiles = clipboard.has('NSFilenamesPboardType')
-      } else if (os.platform() === 'win32') {
-        // Windows 使用原生 API 检测文件
-        try {
-          const files = ClipboardMonitor.getClipboardFiles()
-          hasFiles = files.length > 0
-        } catch (error) {
-          console.error('[Clipboard] 原生 API 获取文件失败:', error)
-          hasFiles = false
-        }
+      try {
+        hasFiles = hasClipboardFiles()
+      } catch (error) {
+        console.error('[Clipboard] 检测文件剪贴板失败:', error)
+        hasFiles = false
       }
 
       if (hasFiles) {
@@ -227,60 +226,9 @@ class ClipboardManager {
     try {
       let files: FileItem[] = []
 
-      if (os.platform() === 'darwin') {
-        // macOS 使用 NSFilenamesPboardType 格式
-        if (!clipboard.has('NSFilenamesPboardType')) {
-          console.error('[Clipboard] 没有文件类型数据')
-          return null as any
-        }
-
-        const result = clipboard.read('NSFilenamesPboardType')
-        console.log('[Clipboard] 文件原始数据:', result)
-
-        if (!result) {
-          console.error('[Clipboard] 读取文件数据为空')
-          return null as any
-        }
-
-        // 解析 plist 格式
-        let filePaths: string[] = []
-        try {
-          filePaths = plist.parse(result) as string[]
-          console.log('[Clipboard] 解析后的文件列表:', filePaths)
-        } catch (error) {
-          console.error('[Clipboard] plist 解析失败:', error)
-          return null as any
-        }
-
-        if (!Array.isArray(filePaths) || filePaths.length === 0) {
-          console.error('[Clipboard] 文件列表为空')
-          return null as any
-        }
-
-        // 处理所有文件，检查是否为文件夹
-        files = await Promise.all(
-          filePaths.map(async (filePath) => {
-            const name = path.basename(filePath)
-            let isDirectory = false
-
-            try {
-              const stat = await fs.stat(filePath)
-              isDirectory = stat.isDirectory()
-            } catch (error) {
-              console.error('[Clipboard] 检查文件状态失败:', filePath, error)
-            }
-
-            return {
-              path: filePath,
-              name,
-              isDirectory
-            }
-          })
-        )
-      } else if (os.platform() === 'win32') {
-        // Windows 使用原生 API 获取文件列表
-        files = ClipboardMonitor.getClipboardFiles()
-        console.log('[Clipboard] 原生 API 获取的文件列表:', files)
+      if (os.platform() === 'darwin' || os.platform() === 'win32') {
+        files = readClipboardFiles()
+        console.log('[Clipboard] 读取到的文件列表:', files)
       }
 
       if (!Array.isArray(files) || files.length === 0) {
@@ -693,32 +641,13 @@ class ClipboardManager {
         }
 
         case 'file': {
-          // 跨平台文件比较
-          if (os.platform() === 'darwin') {
-            if (clipboard.has('NSFilenamesPboardType')) {
-              try {
-                const result = clipboard.read('NSFilenamesPboardType')
-                if (result) {
-                  const currentFilePaths = plist.parse(result) as string[]
-                  const itemFilePaths = item.files?.map((f) => f.path) || []
-                  // 比较文件路径列表（顺序也要一致）
-                  isSame = JSON.stringify(currentFilePaths) === JSON.stringify(itemFilePaths)
-                }
-              } catch (error) {
-                console.error('[Clipboard] 解析当前剪贴板文件列表失败:', error)
-              }
-            }
-          } else {
-            // Windows 使用原生 API
-            try {
-              const currentFiles = ClipboardMonitor.getClipboardFiles()
-              const itemFilePaths = item.files?.map((f) => f.path) || []
-              const currentFilePaths = currentFiles.map((f) => f.path)
-              // 比较文件路径列表（顺序也要一致）
-              isSame = JSON.stringify(currentFilePaths) === JSON.stringify(itemFilePaths)
-            } catch (error) {
-              console.error('[Clipboard] 获取当前剪贴板文件列表失败:', error)
-            }
+          try {
+            const currentFilePaths = readClipboardFilePaths()
+            const itemFilePaths = item.files?.map((f) => f.path) || []
+            // 比较文件路径列表（顺序也要一致）
+            isSame = JSON.stringify(currentFilePaths) === JSON.stringify(itemFilePaths)
+          } catch (error) {
+            console.error('[Clipboard] 获取当前剪贴板文件列表失败:', error)
           }
           break
         }
@@ -757,18 +686,10 @@ class ClipboardManager {
           break
 
         case 'file':
-          // 跨平台写回文件列表
           if (item.files && item.files.length > 0) {
             try {
               const filePaths = item.files.map((f: FileItem) => f.path)
-              if (os.platform() === 'darwin') {
-                // macOS 使用 NSFilenamesPboardType 格式
-                const plistData = plist.stringify(filePaths)
-                clipboard.writeBuffer('NSFilenamesPboardType', Buffer.from(plistData))
-              } else if (os.platform() === 'win32') {
-                // Windows 使用原生 API
-                ClipboardMonitor.setClipboardFiles(filePaths)
-              }
+              writeClipboardFiles(filePaths)
               console.log('[Clipboard] 文件列表已写回剪贴板:', filePaths)
               return true
             } catch (error) {

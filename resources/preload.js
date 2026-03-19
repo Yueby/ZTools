@@ -379,6 +379,8 @@ window.ztools = {
   copyImage: (image) => electron.ipcRenderer.sendSync('copy-image', image),
   // 复制文件到剪贴板
   copyFile: (filePath) => electron.ipcRenderer.sendSync('copy-file', filePath),
+  // 获取剪贴板中复制的文件列表
+  getCopyedFiles: () => electron.ipcRenderer.sendSync('get-copyed-files'),
   // 获取系统路径
   getPath: (name) => electron.ipcRenderer.sendSync('get-path', name),
   // 显示文件保存对话框

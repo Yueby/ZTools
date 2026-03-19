@@ -1,7 +1,6 @@
 import { ipcMain, clipboard, nativeImage } from 'electron'
 import os from 'os'
-import plist from 'simple-plist'
-import { ClipboardMonitor } from '../../core/native'
+import { readClipboardFiles, writeClipboardFiles } from '../../utils/clipboardFiles'
 
 /**
  * 剪贴板基础操作API - 插件专用
@@ -63,20 +62,30 @@ export class PluginClipboardAPI {
       try {
         const files = Array.isArray(filePath) ? filePath : [filePath]
 
-        if (os.platform() === 'win32') {
-          // Windows 使用原生 API
-          ClipboardMonitor.setClipboardFiles(files)
-        } else if (os.platform() === 'darwin') {
-          // macOS 使用 Electron API（原生 API 暂不支持）
-          // macOS 需要使用 plist 格式
-          const plistData = plist.stringify(files)
-          clipboard.writeBuffer('NSFilenamesPboardType', Buffer.from(plistData))
+        if (os.platform() === 'win32' || os.platform() === 'darwin') {
+          writeClipboardFiles(files)
         }
 
         event.returnValue = true
       } catch (error) {
         console.error('[PluginClipboard] 复制文件失败:', error)
         event.returnValue = false
+      }
+    })
+
+    // 获取剪贴板中的文件列表
+    ipcMain.on('get-copyed-files', (event) => {
+      try {
+        const files = readClipboardFiles().map((file) => ({
+          path: file.path,
+          isDirectory: file.isDirectory,
+          isFile: !file.isDirectory,
+          name: file.name
+        }))
+        event.returnValue = files
+      } catch (error) {
+        console.error('[PluginClipboard] 获取剪贴板文件失败:', error)
+        event.returnValue = []
       }
     })
   }

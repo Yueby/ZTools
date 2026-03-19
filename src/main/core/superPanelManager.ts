@@ -1,19 +1,13 @@
 import { BrowserWindow, clipboard, ipcMain, screen } from 'electron'
-import fs from 'fs'
 import os from 'os'
 import path from 'path'
-import plist from 'simple-plist'
 import { is } from '@electron-toolkit/utils'
-import {
-  ClipboardMonitor,
-  MouseMonitor,
-  WindowManager,
-  type MouseMonitorResult
-} from './native/index.js'
+import { MouseMonitor, WindowManager, type MouseMonitorResult } from './native/index.js'
 import { launchApp } from './commandLauncher/index.js'
 import databaseAPI from '../api/shared/database.js'
 import windowManager from '../managers/windowManager.js'
 import clipboardManager from '../managers/clipboardManager.js'
+import { readClipboardFiles } from '../utils/clipboardFiles.js'
 import { applyWindowMaterial, getDefaultWindowMaterial } from '../utils/windowUtils.js'
 
 // 超级面板窗口尺寸
@@ -199,36 +193,9 @@ class SuperPanelManager {
   private readClipboardContent(): ClipboardContent | null {
     try {
       // 优先检测文件
-      if (os.platform() === 'darwin') {
-        if (clipboard.has('NSFilenamesPboardType')) {
-          try {
-            const result = clipboard.read('NSFilenamesPboardType')
-            if (result) {
-              const filePaths = plist.parse(result) as string[]
-              if (Array.isArray(filePaths) && filePaths.length > 0) {
-                const files = filePaths.map((filePath: string) => {
-                  let isDirectory = false
-                  try {
-                    isDirectory = fs.statSync(filePath).isDirectory()
-                  } catch {
-                    // ignore
-                  }
-                  return {
-                    path: filePath,
-                    name: path.basename(filePath),
-                    isDirectory
-                  }
-                })
-                return { type: 'file', files }
-              }
-            }
-          } catch (error) {
-            console.error('[SuperPanel] 读取文件剪贴板失败:', error)
-          }
-        }
-      } else if (os.platform() === 'win32') {
+      if (os.platform() === 'darwin' || os.platform() === 'win32') {
         try {
-          const files = ClipboardMonitor.getClipboardFiles()
+          const files = readClipboardFiles()
           if (Array.isArray(files) && files.length > 0) {
             return { type: 'file', files }
           }
