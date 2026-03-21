@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { DetailPanel } from '@/components'
+import { shuffleArray } from '@/utils'
 import { PluginCard } from '../PluginCard'
+import { RefreshButton } from '../RefreshButton'
 import type { Plugin, CategoryInfo, CategoryLayoutSection } from '../types'
 
 const props = defineProps<{
@@ -28,13 +30,18 @@ function interpolateTemplate(template: string): string {
 
 interface ResolvedSection {
   key: string
+  type: string
   title?: string
   plugins: Plugin[]
+  count?: number
 }
+
+// 用于追踪 random 区块的刷新版本号
+const randomVersion = ref(0)
 
 const resolvedSections = computed<ResolvedSection[]>(() => {
   if (props.layout.length === 0) {
-    return [{ key: 'all', plugins: props.category.plugins }]
+    return [{ key: 'all', type: 'list', plugins: props.category.plugins }]
   }
 
   const sections: ResolvedSection[] = []
@@ -46,6 +53,7 @@ const resolvedSections = computed<ResolvedSection[]>(() => {
     if (section.type === 'list') {
       sections.push({
         key: `list-${i}`,
+        type: 'list',
         title,
         plugins: props.category.plugins
       })
@@ -55,25 +63,28 @@ const resolvedSections = computed<ResolvedSection[]>(() => {
         .map((name) => props.pluginMap.get(name))
         .filter((p): p is Plugin => !!p)
       if (fixedPlugins.length > 0) {
-        sections.push({ key: `fixed-${i}`, title, plugins: fixedPlugins })
+        sections.push({ key: `fixed-${i}`, type: 'fixed', title, plugins: fixedPlugins })
       }
     } else if (section.type === 'random') {
       const count = section.count || 4
-      const shuffled = [...props.category.plugins]
-      for (let k = shuffled.length - 1; k > 0; k--) {
-        const j = Math.floor(Math.random() * (k + 1))
-        ;[shuffled[k], shuffled[j]] = [shuffled[j], shuffled[k]]
-      }
+      // 分类详情页范围较小，从该分类的全部插件中随机选取，允许与 fixed 区块重复
+      const shuffled = shuffleArray(props.category.plugins)
       sections.push({
-        key: `random-${i}`,
+        key: `random-${i}-${randomVersion.value}`,
+        type: 'random',
         title,
-        plugins: shuffled.slice(0, count)
+        plugins: shuffled.slice(0, count),
+        count
       })
     }
   }
 
   return sections
 })
+
+function shuffleSection(): void {
+  randomVersion.value++
+}
 </script>
 <template>
   <DetailPanel :title="category.title" @back="$emit('back')">
@@ -90,8 +101,9 @@ const resolvedSections = computed<ResolvedSection[]>(() => {
       </div>
 
       <div v-for="section in resolvedSections" :key="section.key" class="category-detail-section">
-        <div v-if="section.title" class="section-header">
-          <span class="section-title">{{ section.title }}</span>
+        <div v-if="section.title || section.type === 'random'" class="section-header">
+          <span v-if="section.title" class="section-title">{{ section.title }}</span>
+          <RefreshButton v-if="section.type === 'random'" @click="shuffleSection()" />
         </div>
         <div class="market-grid">
           <PluginCard
@@ -146,6 +158,9 @@ const resolvedSections = computed<ResolvedSection[]>(() => {
 }
 
 .section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   padding: 0 2px;
 }
 

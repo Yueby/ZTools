@@ -8,7 +8,7 @@ import { normalizeIconPath } from '../../common/iconUtils'
 import { isInternalPlugin } from '../../core/internalPlugins'
 import lmdbInstance from '../../core/lmdb/lmdbInstance'
 import windowManager from '../../managers/windowManager'
-import { sleep } from '../../utils/common.js'
+import { sleep, shuffleArray } from '../../utils/common.js'
 import { downloadFile } from '../../utils/download.js'
 import { httpGet } from '../../utils/httpRequest.js'
 import yaml from 'yaml'
@@ -1104,8 +1104,15 @@ export class PluginsAPI {
       : []
     const categoriesList = Array.isArray(categoriesValue) ? categoriesValue : []
 
+    // 按当前平台过滤插件
+    const currentPlatform = process.platform
+    const filteredPlugins = plugins.filter((plugin) => {
+      if (!plugin?.platform || !Array.isArray(plugin.platform)) return true
+      return plugin.platform.includes(currentPlatform)
+    })
+
     const pluginMap = new Map<string, PluginMarketPlugin>()
-    for (const plugin of plugins) {
+    for (const plugin of filteredPlugins) {
       if (plugin?.name) {
         pluginMap.set(plugin.name, plugin)
       }
@@ -1235,16 +1242,11 @@ export class PluginsAPI {
 
       if (section.type === 'random') {
         const count = typeof section.count === 'number' && section.count > 0 ? section.count : 0
-        const availablePlugins = plugins.filter(
+        const availablePlugins = filteredPlugins.filter(
           (plugin) => plugin?.name && !usedPluginNames.has(plugin.name)
         )
         if (count > 0 && availablePlugins.length > 0) {
-          const shuffled = [...availablePlugins]
-          for (let i = shuffled.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1))
-            ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
-          }
-          const randomPlugins = shuffled.slice(0, count)
+          const randomPlugins = shuffleArray(availablePlugins).slice(0, count)
           for (const plugin of randomPlugins) {
             usedPluginNames.add(plugin.name)
           }

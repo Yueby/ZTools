@@ -1,8 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useToast } from '@/components'
-import { compareVersions, upgradeInstalledPluginFromMarket, weightedSearch } from '@/utils'
-import { PluginDetail, PluginCard, CategoryCard, CategoryDetail } from './components'
+import {
+  compareVersions,
+  shuffleArray,
+  upgradeInstalledPluginFromMarket,
+  weightedSearch
+} from '@/utils'
+import { PluginDetail, PluginCard, CategoryCard, CategoryDetail, RefreshButton } from './components'
 import type { Plugin, CategoryInfo, CategoryLayoutSection } from './components'
 import { useJumpFunction, useZtoolsSubInput } from '@/composables'
 import { PluginMarketSettingJumpFunction } from '@/views/PluginMarketSetting/PluginMarketSetting'
@@ -358,8 +363,27 @@ async function handleUninstallPlugin(plugin: Plugin): Promise<void> {
 
 function handleBannerClick(item: BannerItem): void {
   if (item.url) {
-    window.open(item.url, '_blank')
+    window.ztools.shellOpenExternal(item.url)
   }
+}
+
+function shuffleRandomSection(section: StorefrontSection): void {
+  if (section.type !== 'random' || !section.plugins) return
+  const allPlugins = plugins.value
+  const usedNames = new Set<string>()
+
+  // 收集其他区块已使用的插件名
+  for (const s of storefrontSections.value) {
+    if (s === section || s.type === 'banner' || s.type === 'navigation') continue
+    for (const p of s.plugins || []) {
+      usedNames.add(p.name)
+    }
+  }
+
+  // 首页各区块互斥，从未被其他区块使用的插件中随机选取，避免重复展示
+  const available = allPlugins.filter((p) => !usedNames.has(p.name))
+  const count = section.plugins.length
+  section.plugins = shuffleArray(available).slice(0, count)
 }
 
 // 处理 ESC 按键 - 逐级返回
@@ -482,8 +506,12 @@ onUnmounted(() => {
                 v-else-if="section.type === 'fixed' || section.type === 'random'"
                 class="storefront-section"
               >
-                <div v-if="section.title" class="section-header">
-                  <span class="section-title">{{ section.title }}</span>
+                <div v-if="section.title || section.type === 'random'" class="section-header">
+                  <span v-if="section.title" class="section-title">{{ section.title }}</span>
+                  <RefreshButton
+                    v-if="section.type === 'random'"
+                    @click="shuffleRandomSection(section)"
+                  />
                 </div>
                 <div class="market-grid">
                   <PluginCard
