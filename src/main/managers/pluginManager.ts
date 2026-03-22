@@ -426,12 +426,17 @@ export class PluginManager {
     // 恢复显示时关闭节流
     this.applyBackgroundThrottlingByPolicy(this.pluginView, pluginPath, false)
 
+    const mode = await this.getPluginMode(this.pluginView.webContents, featureCode)
+
     console.log('[Plugin] 插件视图获取焦点')
     this.pluginView.webContents.focus()
 
     // 恢复之前的高度或使用默认高度
     const isConfigHeadless = !pluginInfoFromDB?.main
     if (isConfigHeadless) {
+      this.setExpendHeight(0, false)
+    } else if (mode === 'list') {
+      // list 模式先收起，等待 preload 根据列表内容重新设置高度，避免复用旧高度闪烁
       this.setExpendHeight(0, false)
     } else if (this.isFeatureMainHide(pluginPath, featureCode)) {
       // mainHide 的 feature 不需要展示主界面，高度设为 0 避免闪烁
@@ -466,7 +471,7 @@ export class PluginManager {
       pluginPath,
       featureCode
     })
-    return this.processPluginMode(pluginPath, featureCode, this.pluginView, assembly)
+    return this.processPluginMode(pluginPath, featureCode, this.pluginView, assembly, mode)
   }
 
   /**
@@ -1141,9 +1146,10 @@ export class PluginManager {
     pluginPath: string,
     featureCode: string,
     view: WebContentsView,
-    assembly?: AssemblySession
+    assembly?: AssemblySession,
+    resolvedMode?: string
   ): Promise<void> {
-    const mode = await this.getPluginMode(view.webContents, featureCode)
+    const mode = resolvedMode ?? (await this.getPluginMode(view.webContents, featureCode))
     console.log('[Plugin] 插件模式:', {
       assemblyId: assembly?.id,
       pluginPath,
@@ -1183,18 +1189,15 @@ export class PluginManager {
       })
       if (assembly) this.assemblyCoordinator.markSessionStatus(assembly, 'displayed')
     } else if (mode === 'list') {
+      // list 模式先收起，等待 preload 渲染完成后再根据内容精确设置高度
+      this.setExpendHeight(0, false)
+
       // 列表模式：在插件的 WebContentsView 内渲染列表 UI
       if (assembly) {
         this.assemblyCoordinator.markSessionStatus(assembly, 'readyToDisplay')
         const ack = await this.assemblyCoordinator.requestRendererAck(this.mainWindow, assembly)
         if (!ack || !this.assemblyCoordinator.isActiveSession(assembly)) return
       }
-
-      // 使用默认高度显示插件视图（preload 会通过 setExpendHeight 动态调整）
-      const cached = this.pluginViews.find((v) => v.path === pluginPath)
-      let targetHeight = cached?.height || this.pluginDefaultHeight
-      if (targetHeight <= 0) targetHeight = this.pluginDefaultHeight
-      this.setExpendHeight(targetHeight, true)
 
       // 通知插件的 preload 激活列表模式（preload 会自行渲染 UI、设置子输入框）
       view.webContents.send('activate-list-mode', {
