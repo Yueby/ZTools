@@ -236,6 +236,8 @@ class WindowManager {
       } else if (pluginManager.getCurrentPluginPath() !== null) {
         // 如果有插件在显示（且上次不是主窗口），聚焦插件
         pluginManager.focusPluginView()
+        // 修复部分 Windows 系统窗口隐藏再显示后插件白屏
+        pluginManager.forceRepaintCurrentView()
       }
 
       // 恢复完成，清除标志位

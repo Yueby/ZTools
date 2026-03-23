@@ -1048,6 +1048,15 @@ export class PluginManager {
     view.setBounds(bounds)
   }
 
+  /**
+   * 强制重绘当前插件视图（供外部调用，如窗口唤醒时）
+   */
+  public forceRepaintCurrentView(): void {
+    if (this.pluginView) {
+      this.forceRepaintView(this.pluginView)
+    }
+  }
+
   // 设置插件视图高度
   public setExpendHeight(height: number, updateCache: boolean = true): void {
     if (!this.mainWindow || !this.pluginView) return
