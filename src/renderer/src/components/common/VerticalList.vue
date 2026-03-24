@@ -14,14 +14,8 @@
       <div class="item-content">
         <!-- eslint-disable-next-line vue/no-v-html -->
         <div class="item-title" v-html="getHighlightedName(app)"></div>
-        <div v-if="app.pluginExplain" class="item-subtitle">
-          {{ app.pluginExplain }}
-        </div>
-        <div
-          v-else-if="app.type === 'direct' && app.subType === 'app' && app.path"
-          class="item-subtitle"
-        >
-          {{ app.path }}
+        <div v-if="getSubtitle(app)" class="item-subtitle">
+          {{ getSubtitle(app) }}
         </div>
       </div>
       <div v-if="app.type === 'plugin'" class="item-badge">
@@ -53,6 +47,18 @@ defineEmits<{
 
 function getHighlightedName(app: Command): string {
   return highlightMatch(app.name, app.matches, app.matchType, props.searchQuery)
+}
+
+function getSubtitle(app: Command): string {
+  if (app.pluginExplain) {
+    return app.pluginExplain
+  }
+
+  if (app.type === 'direct' && app.subType !== 'system-setting' && app.path) {
+    return app.path
+  }
+
+  return ''
 }
 </script>
 
