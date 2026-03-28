@@ -54,21 +54,19 @@ async function exportPluginDocsToDir(pluginName: string, targetDir: string): Pro
   const keysResult = await databaseAPI.getPluginDocKeys(pluginName)
   if (!keysResult.success) return
   const keys: Array<{ key: string; type: string }> = keysResult.data || []
-  await Promise.all(
-    keys.map(async (item) => {
-      const docResult = await databaseAPI.getPluginDoc(pluginName, item.key)
-      if (docResult.success) {
-        const safeKey = item.key.replace(/[/\\:*?"<>|]/g, '_')
-        const filePath = path.join(targetDir, `${safeKey}.json`)
-        const content = JSON.stringify(
-          { key: item.key, type: item.type, data: docResult.data },
-          null,
-          2
-        )
-        await fs.promises.writeFile(filePath, content, 'utf-8')
-      }
-    })
-  )
+  for (const item of keys) {
+    const docResult = await databaseAPI.getPluginDoc(pluginName, item.key)
+    if (docResult.success) {
+      const safeKey = item.key.replace(/[/\\:*?"<>|]/g, '_')
+      const filePath = path.join(targetDir, `${safeKey}.json`)
+      const content = JSON.stringify(
+        { key: item.key, type: item.type, data: docResult.data },
+        null,
+        2
+      )
+      await fs.promises.writeFile(filePath, content, 'utf-8')
+    }
+  }
 }
 
 /**
@@ -301,7 +299,8 @@ export class InternalPluginAPI {
       try {
         const ts = formatTimestamp(new Date())
         const downloadsDir = app.getPath('downloads')
-        const exportDir = path.join(downloadsDir, `${pluginName}-${ts}`)
+        const safePluginName = pluginName.replace(/[/\\:*?"<>|]/g, '_')
+        const exportDir = path.join(downloadsDir, `${safePluginName}-${ts}`)
         await fs.promises.mkdir(exportDir, { recursive: true })
         await exportPluginDocsToDir(pluginName, exportDir)
         shell.showItemInFolder(exportDir)
