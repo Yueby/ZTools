@@ -36,7 +36,7 @@ class PermissionDeniedError extends Error {
  * 格式化时间为 YYYYMMDDHHmmss
  */
 function formatTimestamp(date: Date): string {
-  const pad = (n: number) => String(n).padStart(2, '0')
+  const pad = (n: number): string => String(n).padStart(2, '0')
   return (
     String(date.getFullYear()) +
     pad(date.getMonth() + 1) +
@@ -392,7 +392,7 @@ export class InternalPluginAPI {
       return await (aiModelsAPI as any).addModel(model)
     })
 
-    ipcMain.handle('internal:ai-models-update', async (event, model: any) => {
+    ipcMain.handle('internal:ai-models-update', async (event, model: any): Promise<any> => {
       if (!requireInternalPlugin(this.pluginManager, event)) {
         throw new PermissionDeniedError('internal:ai-models-update')
       }

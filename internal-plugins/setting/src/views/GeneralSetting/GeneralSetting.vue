@@ -130,6 +130,7 @@ const localAppSearch = ref(true)
 const recentRows = ref(2)
 const pinnedRows = ref(2)
 const searchMode = ref<'aggregate' | 'list'>('aggregate')
+const clipboardRetentionDays = ref(180)
 
 // Tab 键目标指令
 const tabTargetCommand = ref('')
@@ -326,7 +327,7 @@ async function handleWindowDefaultHeightChange(): Promise<void> {
       windowDefaultHeight.value = 541
     }
     await saveSettings()
-    // 通知主进程更新窗口默认高度
+    // 通知主进程更新
     await window.ztools.internal.setWindowDefaultHeight(windowDefaultHeight.value)
     console.log('插件默认高度已更新:', windowDefaultHeight.value)
   } catch (error) {
@@ -343,6 +344,33 @@ async function resetWindowDefaultHeight(): Promise<void> {
     console.log('插件默认高度已重置')
   } catch (error) {
     console.error('重置插件默认高度失败:', error)
+  }
+}
+
+// 处理剪贴板历史保存天数变化
+async function handleClipboardRetentionDaysChange(): Promise<void> {
+  try {
+    if (!clipboardRetentionDays.value || clipboardRetentionDays.value < 1) {
+      clipboardRetentionDays.value = 180
+    }
+    await saveSettings()
+    // 通知主进程更新剪贴板配置
+    await window.ztools.internal.updateClipboardConfig({
+      retentionDays: clipboardRetentionDays.value
+    })
+    console.log('剪贴板历史保存天数已更新:', clipboardRetentionDays.value)
+  } catch (error) {
+    console.error('保存剪贴板历史保存天数失败:', error)
+  }
+}
+
+// 重置剪贴板历史保存天数
+async function resetClipboardRetentionDays(): Promise<void> {
+  try {
+    clipboardRetentionDays.value = 180
+    await handleClipboardRetentionDaysChange()
+  } catch (error) {
+    console.error('重置剪贴板历史保存天数失败:', error)
   }
 }
 
@@ -1146,7 +1174,8 @@ async function saveSettings(): Promise<void> {
       proxyUrl: proxyUrl.value,
       pluginMarketCustom: pluginMarketCustom.value,
       pluginMarketUrl: pluginMarketUrl.value,
-      autoCheckUpdate: autoCheckUpdate.value
+      autoCheckUpdate: autoCheckUpdate.value,
+      clipboardRetentionDays: clipboardRetentionDays.value
     })
   } catch (error) {
     console.error('保存设置失败:', error)
@@ -1671,6 +1700,47 @@ onUnmounted(() => {
             class="btn btn-icon"
             title="重置"
             @click="resetWindowDefaultHeight"
+          >
+            <svg
+              width="20"
+              height="20"
+              viewBox="1 0 18 18"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M14.5 9C14.5 11.4853 12.4853 13.5 10 13.5C7.51472 13.5 5.5 11.4853 5.5 9C5.5 6.51472 7.51472 4.5 10 4.5C11.6569 4.5 13.0943 5.41421 13.8536 6.75M14 4V7H11"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="setting-item">
+        <div class="setting-label">
+          <span>剪贴板历史保存天数</span>
+          <span class="setting-desc">剪贴板历史记录的保留时长（天）</span>
+        </div>
+        <div class="setting-control">
+          <input
+            v-model.number="clipboardRetentionDays"
+            type="number"
+            class="input"
+            placeholder="180"
+            min="1"
+            max="3650"
+            @blur="handleClipboardRetentionDaysChange"
+            @keyup.enter="handleClipboardRetentionDaysChange"
+          />
+          <button
+            v-if="clipboardRetentionDays !== 180"
+            class="btn btn-icon"
+            title="重置"
+            @click="resetClipboardRetentionDays"
           >
             <svg
               width="20"
