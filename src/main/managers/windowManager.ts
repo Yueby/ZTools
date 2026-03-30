@@ -149,6 +149,14 @@ class WindowManager {
 
     this.mainWindow = new BrowserWindow(windowConfig)
 
+    // 强化置顶层级并允许在所有桌面和全屏应用上显示
+    this.mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+    if (platform.isMacOS) {
+      this.mainWindow.setAlwaysOnTop(true, 'main-menu')
+    } else {
+      this.mainWindow.setAlwaysOnTop(true)
+    }
+
     // Windows 11 根据用户配置设置背景材质
     if (platform.isWindows) {
       this.applyWindowMaterialFromSettings()
@@ -516,8 +524,9 @@ class WindowManager {
     // 1. 显示窗口
     this.mainWindow.show()
 
-    // 2. macOS特殊处理：激活应用
+    // 2. macOS特殊处理：重申置顶，防止因为系统事件掉层级
     if (platform.isMacOS) {
+      this.mainWindow.setAlwaysOnTop(true, 'main-menu')
       return
     }
 
@@ -526,13 +535,6 @@ class WindowManager {
 
     // 4. 聚焦窗口
     this.mainWindow.focus()
-
-    // 5. 短暂延迟后恢复正常层级（避免一直置顶）
-    setTimeout(() => {
-      if (this.mainWindow && !this.mainWindow.isDestroyed()) {
-        this.mainWindow.setAlwaysOnTop(false)
-      }
-    }, 100)
   }
 
   /**
