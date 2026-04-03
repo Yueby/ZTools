@@ -1,11 +1,19 @@
 import os from 'os'
-import macZToolsNative from '../../../../resources/lib/mac/ztools_native.node?asset'
-import winZToolsNative from '../../../../resources/lib/win/ztools_native.node?asset'
 
 // 根据平台加载对应的原生模块
 const platform = os.platform()
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const addon = require(platform === 'darwin' ? macZToolsNative : winZToolsNative)
+
+// Linux 平台不加载 .node 原生模块（避免 ELF 格式错误）
+// 其他平台按需加载对应的原生模块
+let addon: any = null
+if (platform !== 'linux') {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const macZToolsNative = require('../../../../resources/lib/mac/ztools_native.node?asset')
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const winZToolsNative = require('../../../../resources/lib/win/ztools_native.node?asset')
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  addon = require(platform === 'darwin' ? macZToolsNative : winZToolsNative)
+}
 
 // 原生模块接口类型定义
 interface UwpAppInfo {

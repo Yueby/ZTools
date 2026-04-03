@@ -1,4 +1,4 @@
-import { clipboard, Notification, BrowserWindow } from 'electron'
+import { clipboard, BrowserWindow } from 'electron'
 import { exec } from 'child_process'
 import fs from 'fs'
 import path from 'path'
@@ -47,6 +47,65 @@ export const handleScreenShots = (
   })
 }
 
+/**
+ * Linux 截图：依次尝试 gnome-screenshot → spectacle → scrot → maim → grim+slurp
+ * 所有工具均以「区域选择截图」模式调用
+ */
+export const handleLinuxScreenShot = (cb: (image: string) => void): void => {
+  const tmpPath = path.join(os.tmpdir(), `screenshot_${Date.now()}.png`)
+
+  const readAndReturn = (): void => {
+    if (fs.existsSync(tmpPath)) {
+      try {
+        const imageBuffer = fs.readFileSync(tmpPath)
+        const base64Image = `data:image/png;base64,${imageBuffer.toString('base64')}`
+        cb(base64Image)
+        fs.unlinkSync(tmpPath)
+      } catch {
+        cb('')
+      }
+    } else {
+      cb('')
+    }
+  }
+
+  // 尝试 gnome-screenshot（GNOME 环境）
+  exec(`gnome-screenshot -a -f "${tmpPath}"`, (err1) => {
+    if (!err1 && fs.existsSync(tmpPath)) {
+      return readAndReturn()
+    }
+
+    // 尝试 spectacle（KDE 环境）
+    exec(`spectacle -r -b -o "${tmpPath}"`, (err2) => {
+      if (!err2 && fs.existsSync(tmpPath)) {
+        return readAndReturn()
+      }
+
+      // 尝试 scrot（通用 X11）
+      exec(`scrot -s "${tmpPath}"`, (err3) => {
+        if (!err3 && fs.existsSync(tmpPath)) {
+          return readAndReturn()
+        }
+
+        // 尝试 maim（通用 X11）
+        exec(`maim -s "${tmpPath}"`, (err4) => {
+          if (!err4 && fs.existsSync(tmpPath)) {
+            return readAndReturn()
+          }
+
+          // 尝试 grim + slurp（Wayland）
+          exec(`grim -g "$(slurp)" "${tmpPath}"`, (err5) => {
+            if (!err5 && fs.existsSync(tmpPath)) {
+              return readAndReturn()
+            }
+            cb('')
+          })
+        })
+      })
+    })
+  })
+}
+
 export const screenCapture = (
   mainWindow?: BrowserWindow,
   restoreShowWindow: boolean = true
@@ -77,12 +136,11 @@ export const screenCapture = (
         resolve({ image, bounds })
       })
     } else {
-      new Notification({
-        title: '兼容性支持度不够',
-        body: 'Linux 系统截图暂不支持，我们将会尽快更新！'
-      }).show()
-      restoreWindow()
-      resolve({ image: '', bounds: undefined })
+      // Linux
+      handleLinuxScreenShot((image) => {
+        restoreWindow()
+        resolve({ image, bounds: undefined })
+      })
     }
   })
 }
