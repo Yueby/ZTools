@@ -182,8 +182,8 @@ export class LocalShortcutsAPI {
 
       console.log('[LocalShortcut] 添加本地启动项成功:', shortcut.name)
 
-      // 通知渲染进程刷新指令列表
-      this.mainWindow?.webContents.send('apps-changed')
+      // 通知渲染进程刷新本地启动项
+      this.mainWindow?.webContents.send('local-shortcuts-changed')
 
       return { success: true }
     } catch (error) {
@@ -286,8 +286,8 @@ export class LocalShortcutsAPI {
 
       console.log('[LocalShortcut] 添加本地启动项成功:', shortcut.name)
 
-      // 通知渲染进程刷新指令列表
-      this.mainWindow?.webContents.send('apps-changed')
+      // 通知渲染进程刷新本地启动项
+      this.mainWindow?.webContents.send('local-shortcuts-changed')
 
       return { success: true }
     } catch (error) {
@@ -312,8 +312,8 @@ export class LocalShortcutsAPI {
 
       console.log('[LocalShortcut] 删除本地启动项成功:', id)
 
-      // 通知渲染进程刷新指令列表
-      this.mainWindow?.webContents.send('apps-changed')
+      // 通知渲染进程刷新本地启动项
+      this.mainWindow?.webContents.send('local-shortcuts-changed')
 
       return { success: true }
     } catch (error) {
@@ -358,8 +358,8 @@ export class LocalShortcutsAPI {
         shortcut.alias || '(无别名)'
       )
 
-      // 通知渲染进程刷新指令列表
-      this.mainWindow?.webContents.send('apps-changed')
+      // 通知渲染进程刷新本地启动项
+      this.mainWindow?.webContents.send('local-shortcuts-changed')
 
       return { success: true }
     } catch (error) {

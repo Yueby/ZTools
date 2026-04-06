@@ -411,6 +411,11 @@ export const useCommandDataStore = defineStore('commandData', () => {
         loadCommands()
       })
 
+      // 监听本地启动项变化事件（添加/删除/别名修改时触发，无需重新扫描系统应用）
+      window.ztools.onLocalShortcutsChanged(() => {
+        reloadLocalShortcuts()
+      })
+
       // 监听固定列表变化事件
       window.ztools.onPinnedChanged(() => {
         // 如果是本地触发的更新，忽略此事件，避免重复加载
@@ -807,6 +812,47 @@ export const useCommandDataStore = defineStore('commandData', () => {
       console.error('加载指令失败:', error)
     } finally {
       loading.value = false
+    }
+  }
+
+  /**
+   * 仅重新加载本地启动项并更新搜索索引，不重新扫描系统应用。
+   */
+  async function reloadLocalShortcuts(): Promise<void> {
+    try {
+      const shortcuts = await window.ztools.localShortcuts.getAll()
+      const newLocalShortcuts: Command[] = shortcuts.map((s: any) => ({
+        name: s.alias || s.name,
+        path: s.path,
+        icon: s.icon,
+        type: 'direct' as const,
+        subType: 'local-shortcut' as const,
+        pinyin: s.pinyin || '',
+        pinyinAbbr: s.pinyinAbbr || '',
+        cmdType: 'text' as const
+      }))
+
+      // 替换 commands 中的本地启动项部分
+      const nonLocalCommands = commands.value.filter((c) => c.subType !== 'local-shortcut')
+      commands.value = [...nonLocalCommands, ...newLocalShortcuts]
+
+      // 重建 Fuse.js 搜索索引
+      fuse.value = new Fuse(commands.value, {
+        keys: [
+          { name: 'name', weight: 2 },
+          { name: 'pinyin', weight: 1.5 },
+          { name: 'pinyinAbbr', weight: 1 },
+          { name: 'acronym', weight: 1.5 }
+        ],
+        threshold: 0,
+        ignoreLocation: true,
+        includeScore: true,
+        includeMatches: true
+      })
+
+      console.log(`[LocalShortcuts] 本地启动项已更新: ${newLocalShortcuts.length} 个`)
+    } catch (error) {
+      console.error('[LocalShortcuts] 重载本地启动项失败:', error)
     }
   }
 
