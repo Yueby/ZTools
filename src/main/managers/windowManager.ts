@@ -80,6 +80,7 @@ class WindowManager {
   private suppressBlurHide: boolean = false // 临时抑制 blur 事件隐藏窗口（文件关联打开等场景）
   private lastBlurHideTime: number = 0 // blur 导致隐藏窗口的时间戳（用于解决托盘点击竞态）
   private appShortcuts: Map<string, string> = new Map() // 应用快捷键映射表 (快捷键 -> 目标指令)
+  private wakeupBlacklist: Array<{ app: string; bundleId?: string; label?: string }> = [] // 唤醒黑名单
   // 应用快捷键触发时携带的当前输入上下文
   private appShortcutLaunchContext: AppShortcutLaunchContext = {
     searchQuery: '',
@@ -316,6 +317,12 @@ class WindowManager {
       }
     })
     // clipboardManager.setWindowFloating(this.mainWindow.getNativeWindowHandle())
+
+    // 从数据库加载唤醒黑名单
+    const initSettings = databaseAPI.dbGet('settings-general')
+    if (initSettings?.wakeupBlacklist) {
+      this.wakeupBlacklist = initSettings.wakeupBlacklist
+    }
 
     return this.mainWindow
   }
@@ -610,6 +617,12 @@ class WindowManager {
     const currentWindow = clipboardManager.getCurrentWindow()
     if (currentWindow) {
       this.previousActiveWindow = currentWindow
+
+      // 唤醒黑名单检查：当前活动窗口在黑名单中时不弹出
+      if (this.isAppInWakeupBlacklist(currentWindow)) {
+        this.isRestoringFocus = false
+        return
+      }
     }
 
     // 移动到鼠标所在显示器（恢复该显示器记忆的位置或居中）
@@ -741,6 +754,28 @@ class WindowManager {
     appPath?: string
   } | null {
     return this.previousActiveWindow
+  }
+
+  /**
+   * 更新唤醒黑名单（由设置或系统指令调用）
+   */
+  public updateWakeupBlacklist(
+    blacklist: Array<{ app: string; bundleId?: string; label?: string }>
+  ): void {
+    this.wakeupBlacklist = blacklist
+  }
+
+  /**
+   * 检查指定窗口是否在唤醒黑名单中
+   */
+  private isAppInWakeupBlacklist(windowInfo: { app: string; bundleId?: string }): boolean {
+    if (this.wakeupBlacklist.length === 0) return false
+    if (process.platform === 'darwin' && windowInfo.bundleId) {
+      return this.wakeupBlacklist.some((item) => item.bundleId === windowInfo.bundleId)
+    }
+    return this.wakeupBlacklist.some(
+      (item) => item.app.toLowerCase() === windowInfo.app.toLowerCase()
+    )
   }
 
   /**

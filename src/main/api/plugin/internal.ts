@@ -926,6 +926,17 @@ export class InternalPluginAPI {
       }
     )
 
+    ipcMain.handle(
+      'internal:update-wakeup-blacklist',
+      async (event, blacklist: Array<{ app: string; bundleId?: string; label?: string }>) => {
+        if (!requireInternalPlugin(this.pluginManager, event)) {
+          throw new PermissionDeniedError('internal:update-wakeup-blacklist')
+        }
+        windowManager.updateWakeupBlacklist(blacklist)
+        return { success: true }
+      }
+    )
+
     ipcMain.handle('internal:get-current-window-info', async (event) => {
       if (!requireInternalPlugin(this.pluginManager, event)) {
         throw new PermissionDeniedError('internal:get-current-window-info')

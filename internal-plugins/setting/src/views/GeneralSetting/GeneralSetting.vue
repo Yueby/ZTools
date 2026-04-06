@@ -153,6 +153,9 @@ const superPanelMouseButton = ref<MouseButtonType>('middle')
 const superPanelLongPressMs = ref(500)
 const superPanelBlockedApps = ref<Array<{ app: string; bundleId?: string; label?: string }>>([])
 
+// 唤醒黑名单
+const wakeupBlacklist = ref<Array<{ app: string; bundleId?: string; label?: string }>>([])
+
 // 超级面板翻译设置
 const superPanelTranslateEnabled = ref(false)
 const translationStatus = ref<'idle' | 'downloading' | 'initializing' | 'ready' | 'error'>('idle')
@@ -812,6 +815,56 @@ async function handleRemoveBlockedApp(index: number): Promise<void> {
   }
 }
 
+// 添加到唤醒黑名单
+async function handleAddWakeupBlacklistApp(): Promise<void> {
+  try {
+    const windowInfo = await window.ztools.internal.getCurrentWindowInfo()
+    if (!windowInfo) {
+      error('无法获取当前窗口信息')
+      return
+    }
+
+    const isDuplicate =
+      platform.value === 'darwin' && windowInfo.bundleId
+        ? wakeupBlacklist.value.some((item) => item.bundleId === windowInfo.bundleId)
+        : wakeupBlacklist.value.some(
+            (item) => item.app.toLowerCase() === windowInfo.app.toLowerCase()
+          )
+
+    if (isDuplicate) {
+      info('该应用已在唤醒黑名单中')
+      return
+    }
+
+    const label = windowInfo.app.replace(/\.(exe|app)$/i, '')
+    wakeupBlacklist.value.push({
+      app: windowInfo.app,
+      bundleId: windowInfo.bundleId,
+      label
+    })
+
+    await saveSettings()
+    await window.ztools.internal.updateWakeupBlacklist(
+      wakeupBlacklist.value.map((item) => ({ ...item }))
+    )
+  } catch (err) {
+    console.error('添加唤醒黑名单失败:', err)
+  }
+}
+
+// 移除唤醒黑名单应用
+async function handleRemoveWakeupBlacklistApp(index: number): Promise<void> {
+  try {
+    wakeupBlacklist.value.splice(index, 1)
+    await saveSettings()
+    await window.ztools.internal.updateWakeupBlacklist(
+      wakeupBlacklist.value.map((item) => ({ ...item }))
+    )
+  } catch (err) {
+    console.error('移除唤醒黑名单失败:', err)
+  }
+}
+
 // 处理主题色变化
 async function handlePrimaryColorChange(color: string): Promise<void> {
   try {
@@ -1115,6 +1168,7 @@ async function loadSettings(): Promise<void> {
       superPanelMouseButton.value = data.superPanelMouseButton ?? 'middle'
       superPanelLongPressMs.value = data.superPanelLongPressMs ?? 500
       superPanelBlockedApps.value = data.superPanelBlockedApps ?? []
+      wakeupBlacklist.value = data.wakeupBlacklist ?? []
       superPanelTranslateEnabled.value = data.superPanelTranslateEnabled ?? false
       if (superPanelTranslateEnabled.value) {
         pollTranslationStatus()
@@ -1197,6 +1251,7 @@ async function saveSettings(): Promise<void> {
       superPanelMouseButton: superPanelMouseButton.value,
       superPanelLongPressMs: superPanelLongPressMs.value,
       superPanelBlockedApps: superPanelBlockedApps.value.map((item) => ({ ...item })),
+      wakeupBlacklist: wakeupBlacklist.value.map((item) => ({ ...item })),
       superPanelTranslateEnabled: superPanelTranslateEnabled.value,
       theme: theme.value,
       primaryColor: primaryColor.value,
@@ -1310,6 +1365,28 @@ onUnmounted(() => {
             <input v-model="showTrayIcon" type="checkbox" @change="handleTrayIconChange" />
             <span class="toggle-slider"></span>
           </label>
+        </div>
+      </div>
+
+      <div class="setting-item blocked-apps-setting">
+        <div class="blocked-apps-content">
+          <div class="blocked-apps-header">
+            <div class="setting-label">
+              <span>唤醒黑名单</span>
+              <span class="setting-desc">在指定应用窗口中按快捷键不唤醒主窗口</span>
+            </div>
+            <div class="setting-control">
+              <button class="btn btn-sm" @click="handleAddWakeupBlacklistApp">添加当前窗口</button>
+            </div>
+          </div>
+          <div v-if="wakeupBlacklist.length > 0" class="blocked-apps-tags">
+            <span v-for="(app, index) in wakeupBlacklist" :key="app.app" class="blocked-app-tag">
+              {{ app.label || app.app }}
+              <button class="blocked-app-remove" @click="handleRemoveWakeupBlacklistApp(index)">
+                &times;
+              </button>
+            </span>
+          </div>
         </div>
       </div>
     </div>

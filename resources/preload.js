@@ -1044,6 +1044,10 @@ window.ztools = {
     getCurrentWindowInfo: async () =>
       await electron.ipcRenderer.invoke('internal:get-current-window-info'),
 
+    // ==================== 唤醒黑名单 API ====================
+    updateWakeupBlacklist: async (blacklist) =>
+      await electron.ipcRenderer.invoke('internal:update-wakeup-blacklist', blacklist),
+
     // 超级面板翻译
     updateSuperPanelTranslate: async (enabled) =>
       await electron.ipcRenderer.invoke('internal:update-super-panel-translate', enabled),

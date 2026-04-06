@@ -104,6 +104,9 @@ export async function executeSystemCommand(
     case 'screenshot':
       return handleScreenshot(ctx)
 
+    case 'add-to-wakeup-blacklist':
+      return handleAddToWakeupBlacklist(ctx)
+
     default:
       // 处理网页快开搜索引擎 (web-search-{id})
       if (command.startsWith('web-search-')) {
@@ -458,4 +461,51 @@ function handleColorPicker(ctx: SystemCommandContext): Promise<any> {
       resolve({ success: false, error: String(error) })
     }
   })
+}
+
+/**
+ * 添加到唤醒黑名单：将唤醒前活动窗口的应用加入黑名单
+ */
+function handleAddToWakeupBlacklist(ctx: SystemCommandContext): any {
+  const winInfo = windowManager.getPreviousActiveWindow()
+  if (!winInfo?.app) {
+    return { success: false, error: '无法获取当前窗口信息' }
+  }
+
+  const settings = databaseAPI.dbGet('settings-general') || {}
+  const blacklist: Array<{ app: string; bundleId?: string; label?: string }> =
+    settings.wakeupBlacklist ?? []
+
+  // 去重：macOS 按 bundleId，Windows 按 app 名称
+  const isDuplicate =
+    process.platform === 'darwin' && winInfo.bundleId
+      ? blacklist.some((item) => item.bundleId === winInfo.bundleId)
+      : blacklist.some((item) => item.app.toLowerCase() === winInfo.app.toLowerCase())
+
+  if (isDuplicate) {
+    ctx.mainWindow?.hide()
+    if (Notification.isSupported()) {
+      new Notification({ title: 'ZTools', body: `${winInfo.app} 已在唤醒黑名单中` }).show()
+    }
+    return { success: false, error: '该应用已在唤醒黑名单中' }
+  }
+
+  const label = winInfo.app.replace(/\.(exe|app)$/i, '')
+  blacklist.push({
+    app: winInfo.app,
+    bundleId: winInfo.bundleId,
+    label
+  })
+
+  databaseAPI.dbPut('settings-general', { ...settings, wakeupBlacklist: blacklist })
+  windowManager.updateWakeupBlacklist(blacklist)
+
+  ctx.mainWindow?.hide()
+  if (Notification.isSupported()) {
+    new Notification({
+      title: 'ZTools',
+      body: `已将 ${label} 添加到唤醒黑名单`
+    }).show()
+  }
+  return { success: true }
 }

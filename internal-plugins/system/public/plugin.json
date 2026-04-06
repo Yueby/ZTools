@@ -97,6 +97,12 @@
       ]
     },
     {
+      "code": "add-to-wakeup-blacklist",
+      "explain": "将当前活动窗口的应用添加到唤醒黑名单",
+      "icon": "wakeup-blacklist.png",
+      "cmds": ["添加到唤醒黑名单", "Wakeup Blacklist"]
+    },
+    {
       "code": "color-picker",
       "explain": "屏幕取色",
       "icon": "color-picker.png",

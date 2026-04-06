@@ -412,6 +412,11 @@ declare global {
           appPath?: string
         } | null>
 
+        // 唤醒黑名单
+        updateWakeupBlacklist: (
+          blacklist: Array<{ app: string; bundleId?: string; label?: string }>
+        ) => Promise<{ success: boolean }>
+
         // 超级面板翻译
         updateSuperPanelTranslate: (enabled: boolean) => Promise<{ success: boolean }>
         getTranslationStatus: () => Promise<{
