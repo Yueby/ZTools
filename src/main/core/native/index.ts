@@ -1,5 +1,5 @@
 import os from 'os'
-import { exec } from 'child_process'
+import { execSync } from 'child_process'
 import { clipboard } from 'electron'
 
 // 根据平台加载对应的原生模块
@@ -311,22 +311,20 @@ export class WindowManager {
       try {
         if (typeof identifier === 'number') {
           // 如果是 PID，查找对应的窗口 ID
-          exec('wmctrl -lp', (err, stdout) => {
-            if (err) return
-
-            const lines = stdout.split('\n')
-            for (const line of lines) {
-              const parts = line.split(/\s+/).filter(Boolean)
-              if (parts.length >= 3 && parts[2] === identifier.toString()) {
-                const wid = parts[0]
-                exec(`wmctrl -ia ${wid}`)
-                break
-              }
+          // 使用 execSync 确保操作同步执行
+          const stdout = execSync('wmctrl -lp').toString()
+          const lines = stdout.split('\n')
+          for (const line of lines) {
+            const parts = line.split(/\s+/).filter(Boolean)
+            if (parts.length >= 3 && parts[2] === identifier.toString()) {
+              const wid = parts[0]
+              execSync(`wmctrl -ia ${wid}`)
+              break
             }
-          })
+          }
         } else {
           // 如果是字符串，尝试按标题/类名激活
-          exec(`wmctrl -a "${identifier}"`)
+          execSync(`wmctrl -a "${identifier}"`)
         }
         return true
       } catch (e) {

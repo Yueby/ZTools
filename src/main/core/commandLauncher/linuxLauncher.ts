@@ -72,7 +72,8 @@ export async function launchApp(
     // 使用 spawn + detached: true + stdio: 'ignore'
     // 这样不会阻塞主进程，且不会因为应用退出码非 0 而报错（常见于 WeChat 等应用）
     try {
-      const child = spawn(appPath, {
+      // 建议对 appPath 进行引号包裹以确保路径被正确识别
+      const child = spawn('"' + appPath + '"', {
         shell: true,
         detached: true,
         stdio: 'ignore'
